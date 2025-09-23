@@ -16,4 +16,7 @@ interface GameSessionDao {
 
     @Query("SELECT * FROM game_sessions WHERE childUserId = :childUserId AND gameType = :gameType ORDER BY timestamp DESC")
     fun getSessionsByChildAndType(childUserId: Long, gameType: String): Flow<List<GameSession>>
+
+    @Query("SELECT * FROM game_sessions WHERE childUserId = :childUserId AND timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp DESC")
+    fun getSessionsByChildAndDateRange(childUserId: Long, startTime: Long, endTime: Long): Flow<List<GameSession>>
 }

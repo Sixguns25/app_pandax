@@ -58,6 +58,9 @@ class AuthRepository(private val db: AppDatabase) {
         if (userDao.getByUsername(username) != null) {
             return Result.failure(Exception("Usuario ya existe"))
         }
+        if (specialistId != null && specialistDao.getByUserId(specialistId) == null) {
+            return Result.failure(Exception("Especialista no existe"))
+        }
         val (salt, hash) = PasswordUtils.hashPasswordWithSalt(password)
         val user = User(username = username, passwordHash = hash, salt = salt, role = "CHILD")
         val id = userDao.insert(user)
