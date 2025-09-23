@@ -10,10 +10,12 @@ import androidx.compose.ui.unit.dp
 import com.tesis.aplicacionpandax.data.entity.Child
 import kotlinx.coroutines.flow.Flow
 import androidx.compose.runtime.collectAsState
+import androidx.navigation.NavController
 
 @Composable
 fun SpecialistChildrenScreen(
-    childrenFlow: Flow<List<Child>>
+    childrenFlow: Flow<List<Child>>,
+    navController: NavController
 ) {
     val children by childrenFlow.collectAsState(initial = emptyList())
 
@@ -37,10 +39,12 @@ fun SpecialistChildrenScreen(
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("${child.firstName} ${child.lastName}", style = MaterialTheme.typography.titleMedium)
-                            Text("DNI: ${child.dni}")
-                            Text("Condición: ${child.condition}")
-                            Text("Apoderado: ${child.guardianName} (${child.guardianPhone})")
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = {
+                                navController.navigate("child_progress/${child.userId}")  // Nueva route
+                            }) {
+                                Text("Ver Progreso")
+                            }
                         }
                     }
                 }

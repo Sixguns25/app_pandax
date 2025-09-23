@@ -13,11 +13,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.tesis.aplicacionpandax.data.entity.Child
+import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
 import kotlinx.coroutines.flow.Flow
 
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.Flow
 fun SpecialistHomeScreen(
     specialistId: Long,
     childrenFlow: Flow<List<Child>>,
+    progressRepo: ProgressRepository, // Agregar parámetro
     onLogout: () -> Unit
 ) {
     val navController = rememberNavController()
@@ -57,13 +60,23 @@ fun SpecialistHomeScreen(
             modifier = Modifier.padding(padding)
         ) {
             composable("children") {
-                SpecialistChildrenScreen(childrenFlow)
+                SpecialistChildrenScreen(
+                    childrenFlow = childrenFlow,
+                    navController = navController // Pasar navController
+                )
             }
             composable("profile") {
                 SpecialistProfileScreen(specialistId)
             }
             composable("settings") {
                 SpecialistSettingsScreen(onLogout)
+            }
+            composable("child_progress/{childId}") { backStackEntry ->
+                val childId = backStackEntry.arguments?.getString("childId")?.toLong() ?: -1
+                ChildProgressDetailScreen(
+                    childUserId = childId,
+                    progressRepo = progressRepo // Usar progressRepo pasado
+                )
             }
         }
     }

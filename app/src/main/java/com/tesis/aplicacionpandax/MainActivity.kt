@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.repository.AuthRepository
+import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.viewmodel.AuthViewModel
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
 import com.tesis.aplicacionpandax.ui.screens.admin.AdminHomeScreen
@@ -30,13 +31,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val db = AppDatabase.getInstance(applicationContext, applicationScope)
-        val repo = AuthRepository(db)
+        val authRepo = AuthRepository(db)
+        val progressRepo = ProgressRepository(db)
 
         setContent {
             val viewModel: AuthViewModel = viewModel(
                 factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return AuthViewModel(repo) as T
+                        return AuthViewModel(authRepo) as T
                     }
                 }
             )
@@ -79,13 +81,13 @@ class MainActivity : ComponentActivity() {
                 }
                 composable(NavRoutes.RegisterSpecialist.route) {
                     RegisterSpecialistScreen(
-                        repo = repo,
+                        repo = authRepo,
                         onBack = { navController.popBackStack() }
                     )
                 }
                 composable(NavRoutes.RegisterChild.route) {
                     RegisterChildScreen(
-                        repo = repo,
+                        repo = authRepo,
                         specialists = specialists,
                         onBack = { navController.popBackStack() }
                     )
@@ -96,6 +98,7 @@ class MainActivity : ComponentActivity() {
                     SpecialistHomeScreen(
                         specialistId = loggedUserId ?: -1,
                         childrenFlow = db.childDao().getChildrenForSpecialist(loggedUserId ?: -1),
+                        progressRepo = progressRepo, // Agregar progressRepo
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -116,6 +119,7 @@ class MainActivity : ComponentActivity() {
                     ChildHomeScreen(
                         child = child,
                         specialist = specialist,
+                        progressRepo = progressRepo,
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
