@@ -108,6 +108,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                composable(NavRoutes.SpecialistRegisterChild.route) {
+                    RegisterChildScreen(
+                        repo = authRepo,
+                        specialists = specialists,
+                        onBack = { navController.popBackStack() },
+                        specialistId = loggedUserId // Pasamos el ID del especialista logueado
+                    )
+                }
+
                 // Child
                 composable(NavRoutes.ChildHome.route) {
                     val childFlow = db.childDao().getChildByUserId(loggedUserId ?: -1)

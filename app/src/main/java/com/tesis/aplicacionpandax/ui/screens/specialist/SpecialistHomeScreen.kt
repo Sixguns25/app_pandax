@@ -12,15 +12,21 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Child
+import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
+import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
+import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
 import kotlinx.coroutines.flow.Flow
 
 @Composable
@@ -76,6 +82,15 @@ fun SpecialistHomeScreen(
                 ChildProgressDetailScreen(
                     childUserId = childId,
                     progressRepo = progressRepo // Usar progressRepo pasado
+                )
+            }
+            // Nueva ruta para registrar niños
+            composable(NavRoutes.SpecialistRegisterChild.route) {
+                RegisterChildScreen(
+                    repo = AuthRepository(AppDatabase.getInstance(LocalContext.current, rememberCoroutineScope())),
+                    specialists = emptyList(), // No necesitamos lista de especialistas aquí
+                    onBack = { navController.popBackStack() },
+                    specialistId = specialistId // Pasamos el ID del especialista
                 )
             }
         }

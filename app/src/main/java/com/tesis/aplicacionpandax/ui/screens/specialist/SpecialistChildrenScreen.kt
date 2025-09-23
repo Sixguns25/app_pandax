@@ -11,6 +11,7 @@ import com.tesis.aplicacionpandax.data.entity.Child
 import kotlinx.coroutines.flow.Flow
 import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavController
+import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
 
 @Composable
 fun SpecialistChildrenScreen(
@@ -27,6 +28,15 @@ fun SpecialistChildrenScreen(
         Text("Niños asignados:", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Botón para registrar nuevo niño
+        Button(
+            onClick = { navController.navigate(NavRoutes.SpecialistRegisterChild.route) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Registrar Nuevo Niño")
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (children.isEmpty()) {
             Text("No tienes niños asignados todavía.")
         } else {
@@ -39,9 +49,11 @@ fun SpecialistChildrenScreen(
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
+                            // Agrega info del niño (fix del bug anterior)
+                            Text("${child.firstName} ${child.lastName} - DNI: ${child.dni}")
                             Spacer(Modifier.height(8.dp))
                             Button(onClick = {
-                                navController.navigate("child_progress/${child.userId}")  // Nueva route
+                                navController.navigate("child_progress/${child.userId}")
                             }) {
                                 Text("Ver Progreso")
                             }

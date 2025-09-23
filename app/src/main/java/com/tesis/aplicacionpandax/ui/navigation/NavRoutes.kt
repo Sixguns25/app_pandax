@@ -13,4 +13,6 @@ sealed class NavRoutes(val route: String) {
 
     // Child
     object ChildHome : NavRoutes("child_home")
+
+    object SpecialistRegisterChild : NavRoutes("specialist_register_child")
 }
