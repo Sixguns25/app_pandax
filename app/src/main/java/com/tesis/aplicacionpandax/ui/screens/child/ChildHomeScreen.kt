@@ -1,4 +1,4 @@
-package com.tesis.aplicacionpandax.ui.screens
+package com.tesis.aplicacionpandax.ui.screens.child
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*

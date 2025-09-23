@@ -1,4 +1,4 @@
-package com.tesis.aplicacionpandax.ui.screens
+package com.tesis.aplicacionpandax.ui.screens.specialist
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

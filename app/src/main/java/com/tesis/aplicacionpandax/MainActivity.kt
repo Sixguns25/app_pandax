@@ -11,9 +11,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.repository.AuthRepository
-import com.tesis.aplicacionpandax.ui.screens.*
 import com.tesis.aplicacionpandax.ui.viewmodel.AuthViewModel
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
+import com.tesis.aplicacionpandax.ui.screens.admin.AdminHomeScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.RegisterSpecialistScreen
+import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeScreen
+import com.tesis.aplicacionpandax.ui.screens.common.LoginScreen
+import com.tesis.aplicacionpandax.ui.screens.specialist.SpecialistHomeScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
