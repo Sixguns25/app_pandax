@@ -2,11 +2,13 @@ package com.tesis.aplicacionpandax.ui.screens.child
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Child
 import com.tesis.aplicacionpandax.data.entity.Specialist
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -14,8 +16,24 @@ import java.util.Locale
 @Composable
 fun ChildHomeSection(
     child: Child?,
-    specialist: Specialist?
+    specialist: Specialist?,
+    db: AppDatabase
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    var specialtyName by remember { mutableStateOf<String?>(null) }  // Estado para el nombre de la especialidad
+
+    // Cargar el nombre de la especialidad cuando specialist cambia
+    LaunchedEffect(specialist?.specialtyId) {
+        if (specialist != null) {
+            coroutineScope.launch {
+                val specialty = db.specialtyDao().getById(specialist.specialtyId)
+                specialtyName = specialty?.name
+            }
+        } else {
+            specialtyName = null
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -44,7 +62,7 @@ fun ChildHomeSection(
         if (specialist == null) {
             Text("No asignado")
         } else {
-            Text("${specialist.firstName} ${specialist.lastName} - ${specialist.specialty}")
+            Text("${specialist.firstName} ${specialist.lastName} - ${specialtyName ?: "Desconocida"}")
         }
     }
 }

@@ -9,6 +9,7 @@ class AuthRepository(private val db: AppDatabase) {
     private val userDao = db.userDao()
     private val specialistDao = db.specialistDao()
     private val childDao = db.childDao()
+    private val specialtyDao = db.specialtyDao()  // Agregado para acceder a la tabla specialties
 
     // 🔹 Login
     suspend fun login(username: String, password: String): Result<User> {
@@ -27,16 +28,19 @@ class AuthRepository(private val db: AppDatabase) {
         lastName: String,
         phone: String,
         email: String,
-        specialty: String
+        specialtyId: Long  // Cambiado de specialty: String a specialtyId: Long
     ): Result<Long> {
         if (userDao.getByUsername(username) != null) {
             return Result.failure(Exception("Usuario ya existe"))
+        }
+        if (specialtyDao.getById(specialtyId) == null) {  // Validar que la especialidad exista
+            return Result.failure(Exception("Especialidad no existe"))
         }
         val (salt, hash) = PasswordUtils.hashPasswordWithSalt(password)
         val user = User(username = username, passwordHash = hash, salt = salt, role = "SPECIALIST")
         val id = userDao.insert(user)
         specialistDao.insert(
-            Specialist(userId = id, firstName, lastName, phone, email, specialty)
+            Specialist(userId = id, firstName, lastName, phone, email, specialtyId)  // Corregido
         )
         return Result.success(id)
     }

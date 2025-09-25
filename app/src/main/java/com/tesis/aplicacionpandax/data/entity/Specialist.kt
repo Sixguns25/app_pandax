@@ -12,7 +12,14 @@ import androidx.room.ForeignKey
             parentColumns = ["userId"],
             childColumns = ["userId"],
             onDelete = ForeignKey.CASCADE
-        )
+        ),
+        ForeignKey(
+            entity = Specialty::class,
+            parentColumns = ["id"],
+            childColumns = ["specialtyId"],
+            onDelete = ForeignKey.CASCADE //para evitar borrar especialidades si hay especialistas asignados
+        ),
+
     ]
 )
 data class Specialist(
@@ -21,5 +28,5 @@ data class Specialist(
     val lastName: String,
     val phone: String,
     val email: String,
-    val specialty: String
+    val specialtyId: Long // FK a Speciality.id
 )

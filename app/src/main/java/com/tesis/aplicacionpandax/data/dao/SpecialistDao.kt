@@ -19,4 +19,7 @@ interface SpecialistDao {
 
     @Query("SELECT * FROM specialists WHERE userId = :id LIMIT 1")
     fun getById(id: Long): Flow<Specialist?>
+
+    @Query("SELECT * FROM specialists WHERE specialtyId = :specialtyId")
+    suspend fun getSpecialistsBySpecialtyId(specialtyId: Long): List<Specialist>
 }

@@ -20,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Child
 import com.tesis.aplicacionpandax.data.entity.GameSession
 import com.tesis.aplicacionpandax.data.entity.Specialist
@@ -35,6 +36,7 @@ fun ChildHomeScreen(
     child: Child?,
     specialist: Specialist?,
     progressRepo: ProgressRepository,
+    db: AppDatabase,
     onLogout: () -> Unit
 ) {
     val navController = rememberNavController()
@@ -69,7 +71,7 @@ fun ChildHomeScreen(
             modifier = Modifier.padding(padding)
         ) {
             composable("home") {
-                ChildHomeSection(child, specialist)
+                ChildHomeSection(child, specialist, db)
             }
             composable("games") {
                 GamesMenuScreen(child = child, navController = navController)

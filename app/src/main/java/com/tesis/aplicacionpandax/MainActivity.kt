@@ -17,6 +17,7 @@ import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
 import com.tesis.aplicacionpandax.ui.screens.admin.AdminHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterSpecialistScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.SpecialtiesManagementScreen
 import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.common.LoginScreen
 import com.tesis.aplicacionpandax.ui.screens.specialist.SpecialistHomeScreen
@@ -71,6 +72,7 @@ class MainActivity : ComponentActivity() {
                     AdminHomeScreen(
                         onRegisterSpecialist = { navController.navigate(NavRoutes.RegisterSpecialist.route) },
                         onRegisterChild = { navController.navigate(NavRoutes.RegisterChild.route) },
+                        onManageSpecialties = { navController.navigate("manage_specialties") }, // Agregado
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -82,6 +84,7 @@ class MainActivity : ComponentActivity() {
                 composable(NavRoutes.RegisterSpecialist.route) {
                     RegisterSpecialistScreen(
                         repo = authRepo,
+                        db = db,
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -92,13 +95,19 @@ class MainActivity : ComponentActivity() {
                         onBack = { navController.popBackStack() }
                     )
                 }
+                composable("manage_specialties") { // Nueva ruta
+                    SpecialtiesManagementScreen(
+                        db = db,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
 
                 // Specialist
                 composable(NavRoutes.SpecialistHome.route) {
                     SpecialistHomeScreen(
                         specialistId = loggedUserId ?: -1,
                         childrenFlow = db.childDao().getChildrenForSpecialist(loggedUserId ?: -1),
-                        progressRepo = progressRepo, // Agregar progressRepo
+                        progressRepo = progressRepo,
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -113,7 +122,7 @@ class MainActivity : ComponentActivity() {
                         repo = authRepo,
                         specialists = specialists,
                         onBack = { navController.popBackStack() },
-                        specialistId = loggedUserId // Pasamos el ID del especialista logueado
+                        specialistId = loggedUserId
                     )
                 }
 
@@ -129,6 +138,7 @@ class MainActivity : ComponentActivity() {
                         child = child,
                         specialist = specialist,
                         progressRepo = progressRepo,
+                        db = db,
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -137,7 +147,6 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
-
             }
         }
     }
