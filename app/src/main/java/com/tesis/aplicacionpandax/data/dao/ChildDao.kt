@@ -15,7 +15,7 @@ interface ChildDao {
     suspend fun getByUserId(userId: Long): Child?
 
     @Query("SELECT * FROM children WHERE specialistId = :specialistId")
-    fun getBySpecialist(specialistId: Long): Flow<List<Child>>
+    suspend fun getBySpecialist(specialistId: Long): List<Child> // Cambiado de Flow a List
 
     @Query("SELECT * FROM children")
     fun getAll(): Flow<List<Child>>

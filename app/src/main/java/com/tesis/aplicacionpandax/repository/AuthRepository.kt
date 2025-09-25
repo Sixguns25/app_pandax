@@ -9,7 +9,7 @@ class AuthRepository(private val db: AppDatabase) {
     private val userDao = db.userDao()
     private val specialistDao = db.specialistDao()
     private val childDao = db.childDao()
-    private val specialtyDao = db.specialtyDao()  // Agregado para acceder a la tabla specialties
+    private val specialtyDao = db.specialtyDao()
 
     // 🔹 Login
     suspend fun login(username: String, password: String): Result<User> {
@@ -20,7 +20,7 @@ class AuthRepository(private val db: AppDatabase) {
         else Result.failure(Exception("Contraseña incorrecta"))
     }
 
-    // 🔹 Registro de especialista (solo admin puede llamar)
+    // 🔹 Registro de especialista (Create)
     suspend fun registerSpecialist(
         username: String,
         password: String,
@@ -28,24 +28,73 @@ class AuthRepository(private val db: AppDatabase) {
         lastName: String,
         phone: String,
         email: String,
-        specialtyId: Long  // Cambiado de specialty: String a specialtyId: Long
+        specialtyId: Long
     ): Result<Long> {
         if (userDao.getByUsername(username) != null) {
             return Result.failure(Exception("Usuario ya existe"))
         }
-        if (specialtyDao.getById(specialtyId) == null) {  // Validar que la especialidad exista
+        if (specialtyDao.getById(specialtyId) == null) {
             return Result.failure(Exception("Especialidad no existe"))
         }
         val (salt, hash) = PasswordUtils.hashPasswordWithSalt(password)
         val user = User(username = username, passwordHash = hash, salt = salt, role = "SPECIALIST")
         val id = userDao.insert(user)
         specialistDao.insert(
-            Specialist(userId = id, firstName, lastName, phone, email, specialtyId)  // Corregido
+            Specialist(userId = id, firstName, lastName, phone, email, specialtyId)
         )
         return Result.success(id)
     }
 
-    // 🔹 Registro de niño (admin o especialista)
+    // 🔹 Actualizar especialista (Update)
+    suspend fun updateSpecialist(
+        specialistId: Long,
+        firstName: String,
+        lastName: String,
+        phone: String,
+        email: String,
+        specialtyId: Long,
+        password: String? = null
+    ): Result<Unit> {
+        val specialist = specialistDao.getByUserId(specialistId)
+            ?: return Result.failure(Exception("Especialista no encontrado"))
+        if (specialtyDao.getById(specialtyId) == null) {
+            return Result.failure(Exception("Especialidad no existe"))
+        }
+        val updatedSpecialist = specialist.copy(
+            firstName = firstName.trim(),
+            lastName = lastName.trim(),
+            phone = phone.trim(),
+            email = email.trim(),
+            specialtyId = specialtyId
+        )
+        specialistDao.update(updatedSpecialist)
+
+        if (password != null && password.isNotBlank()) {
+            val user = userDao.getById(specialistId)
+                ?: return Result.failure(Exception("Usuario no encontrado"))
+            val (salt, hash) = PasswordUtils.hashPasswordWithSalt(password)
+            val updatedUser = user.copy(passwordHash = hash, salt = salt)
+            userDao.update(updatedUser)
+        }
+        return Result.success(Unit)
+    }
+
+    // 🔹 Eliminar especialista (Delete)
+    suspend fun deleteSpecialist(specialistId: Long): Result<Unit> {
+        val assignedChildren = childDao.getBySpecialist(specialistId)
+        if (assignedChildren.isNotEmpty()) {
+            return Result.failure(Exception("No se puede eliminar, hay niños asignados"))
+        }
+        val specialist = specialistDao.getByUserId(specialistId)
+            ?: return Result.failure(Exception("Especialista no encontrado"))
+        val user = userDao.getById(specialistId)
+            ?: return Result.failure(Exception("Usuario no encontrado"))
+        specialistDao.delete(specialist)
+        userDao.delete(user)
+        return Result.success(Unit)
+    }
+
+    // 🔹 Registro de niño
     suspend fun registerChild(
         username: String,
         password: String,

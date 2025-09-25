@@ -6,9 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.*
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
@@ -18,6 +20,8 @@ import com.tesis.aplicacionpandax.ui.screens.admin.AdminHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterSpecialistScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.SpecialtiesManagementScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.SpecialistsManagementScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.SpecialistDetailScreen
 import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.common.LoginScreen
 import com.tesis.aplicacionpandax.ui.screens.specialist.SpecialistHomeScreen
@@ -72,7 +76,8 @@ class MainActivity : ComponentActivity() {
                     AdminHomeScreen(
                         onRegisterSpecialist = { navController.navigate(NavRoutes.RegisterSpecialist.route) },
                         onRegisterChild = { navController.navigate(NavRoutes.RegisterChild.route) },
-                        onManageSpecialties = { navController.navigate("manage_specialties") }, // Agregado
+                        onManageSpecialties = { navController.navigate("manage_specialties") },
+                        onManageSpecialists = { navController.navigate("manage_specialists") },
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -85,6 +90,19 @@ class MainActivity : ComponentActivity() {
                     RegisterSpecialistScreen(
                         repo = authRepo,
                         db = db,
+                        specialistId = -1L, // Creación
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = "${NavRoutes.RegisterSpecialist.route}/{specialistId}",
+                    arguments = listOf(navArgument("specialistId") { type = NavType.LongType; defaultValue = -1L })
+                ) { backStackEntry ->
+                    val specialistId = backStackEntry.arguments?.getLong("specialistId") ?: -1L
+                    RegisterSpecialistScreen(
+                        repo = authRepo,
+                        db = db,
+                        specialistId = specialistId,
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -95,10 +113,28 @@ class MainActivity : ComponentActivity() {
                         onBack = { navController.popBackStack() }
                     )
                 }
-                composable("manage_specialties") { // Nueva ruta
+                composable("manage_specialties") {
                     SpecialtiesManagementScreen(
                         db = db,
                         onBack = { navController.popBackStack() }
+                    )
+                }
+                composable("manage_specialists") {
+                    SpecialistsManagementScreen(
+                        db = db,
+                        repo = authRepo,
+                        navController = navController
+                    )
+                }
+                composable(
+                    route = "specialist_detail/{specialistId}",
+                    arguments = listOf(navArgument("specialistId") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val specialistId = backStackEntry.arguments?.getLong("specialistId") ?: -1L
+                    SpecialistDetailScreen(
+                        navController = navController,
+                        db = db,
+                        specialistId = specialistId
                     )
                 }
 

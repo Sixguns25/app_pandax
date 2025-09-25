@@ -11,7 +11,8 @@ import androidx.compose.ui.unit.dp
 fun AdminHomeScreen(
     onRegisterSpecialist: () -> Unit,
     onRegisterChild: () -> Unit,
-    onManageSpecialties: () -> Unit, // Agregado
+    onManageSpecialties: () -> Unit,
+    onManageSpecialists: () -> Unit,
     onLogout: () -> Unit
 ) {
     Column(
@@ -47,6 +48,15 @@ fun AdminHomeScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Gestionar Especialidades")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onManageSpecialists, // Nuevo botón
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Gestionar Especialistas")
         }
 
         Spacer(modifier = Modifier.height(16.dp))

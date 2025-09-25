@@ -8,52 +8,102 @@ import androidx.compose.ui.unit.dp
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Specialty
 import com.tesis.aplicacionpandax.repository.AuthRepository
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterSpecialistScreen(
     repo: AuthRepository,
-    db: AppDatabase,  // Agregado para acceder a specialtyDao
+    db: AppDatabase,
+    specialistId: Long = -1L, // Agregado para edición
     onBack: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    val specialties by db.specialtyDao().getAll().collectAsState(initial = emptyList())
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
-    var selectedSpecialtyId by remember { mutableStateOf<Long?>(null) }  // Cambiado de specialty a selectedSpecialtyId
-    var expanded by remember { mutableStateOf(false) }  // Estado para dropdown
+    var selectedSpecialtyId by remember { mutableStateOf<Long?>(null) }
+    var expanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    val scope = rememberCoroutineScope()
-    val specialties by db.specialtyDao().getAll().collectAsState(initial = emptyList())  // Obtener especialidades
+    // Cargar datos si es edición
+    LaunchedEffect(specialistId) {
+        if (specialistId != -1L) {
+            coroutineScope.launch {
+                val specialist = db.specialistDao().getByUserId(specialistId)
+                val user = db.userDao().getById(specialistId)
+                if (specialist != null && user != null) {
+                    username = user.username
+                    firstName = specialist.firstName
+                    lastName = specialist.lastName
+                    phone = specialist.phone
+                    email = specialist.email
+                    selectedSpecialtyId = specialist.specialtyId
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        Text("Registrar Especialista", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            if (specialistId == -1L) "Registrar Especialista" else "Editar Especialista",
+            style = MaterialTheme.typography.headlineMedium
+        )
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Usuario") })
-        OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Contraseña") })
-        OutlinedTextField(value = firstName, onValueChange = { firstName = it }, label = { Text("Nombres") })
-        OutlinedTextField(value = lastName, onValueChange = { lastName = it }, label = { Text("Apellidos") })
-        OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Teléfono") })
-        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Correo") })
-
-        // Dropdown para especialidades
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Usuario") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = specialistId == -1L // Username no editable
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Contraseña") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = firstName,
+            onValueChange = { firstName = it },
+            label = { Text("Nombres") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = lastName,
+            onValueChange = { lastName = it },
+            label = { Text("Apellidos") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { phone = it },
+            label = { Text("Teléfono") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Correo") },
+            modifier = Modifier.fillMaxWidth()
+        )
         ExposedDropdownMenuBox(
             expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
-            modifier = Modifier.fillMaxWidth()
+            onExpandedChange = { expanded = !expanded }
         ) {
             OutlinedTextField(
-                value = specialties.find { it.id == selectedSpecialtyId }?.name ?: "Seleccionar especialidad",
+                value = specialties.find { it.id == selectedSpecialtyId }?.name ?: "Seleccionar",
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Especialidad") },
@@ -65,11 +115,11 @@ fun RegisterSpecialistScreen(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
             ) {
-                specialties.forEach { specialty ->
+                specialties.forEach { spec ->
                     DropdownMenuItem(
-                        text = { Text(specialty.name) },
+                        text = { Text(spec.name) },
                         onClick = {
-                            selectedSpecialtyId = specialty.id
+                            selectedSpecialtyId = spec.id
                             expanded = false
                         }
                     )
@@ -79,32 +129,71 @@ fun RegisterSpecialistScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = {
-            if (selectedSpecialtyId == null) {
-                message = "Error: Selecciona una especialidad"
-                return@Button
-            }
-            scope.launch {
-                val result = repo.registerSpecialist(
-                    username, password, firstName, lastName, phone, email, selectedSpecialtyId!!  // Usa specialtyId
-                )
-                message = result.fold(
-                    onSuccess = { "Especialista registrado correctamente ✅" },
-                    onFailure = { "Error: ${it.message}" }
-                )
-            }
-        }, modifier = Modifier.fillMaxWidth()) {
-            Text("Registrar")
+        Button(
+            onClick = {
+                if (username.isBlank() || (specialistId == -1L && password.isBlank()) ||
+                    firstName.isBlank() || lastName.isBlank() || phone.isBlank() ||
+                    email.isBlank() || selectedSpecialtyId == null
+                ) {
+                    message = "Por favor, completa todos los campos"
+                    return@Button
+                }
+                coroutineScope.launch {
+                    if (specialistId == -1L) {
+                        // Registrar nuevo especialista
+                        repo.registerSpecialist(
+                            username = username,
+                            password = password,
+                            firstName = firstName,
+                            lastName = lastName,
+                            phone = phone,
+                            email = email,
+                            specialtyId = selectedSpecialtyId!!
+                        ).fold(
+                            onSuccess = {
+                                message = "Especialista registrado correctamente ✅"
+                                onBack()
+                            },
+                            onFailure = { message = "Error: ${it.message}" }
+                        )
+                    } else {
+                        // Actualizar especialista existente
+                        repo.updateSpecialist(
+                            specialistId = specialistId,
+                            firstName = firstName,
+                            lastName = lastName,
+                            phone = phone,
+                            email = email,
+                            specialtyId = selectedSpecialtyId!!,
+                            password = if (password.isNotBlank()) password else null
+                        ).fold(
+                            onSuccess = {
+                                message = "Especialista actualizado correctamente ✅"
+                                onBack()
+                            },
+                            onFailure = { message = "Error: ${it.message}" }
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (specialistId == -1L) "Registrar" else "Actualizar")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+        ) {
+            Text("Volver")
         }
 
         message?.let {
             Spacer(modifier = Modifier.height(8.dp))
             Text(it, color = MaterialTheme.colorScheme.primary)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Volver")
         }
     }
 }
