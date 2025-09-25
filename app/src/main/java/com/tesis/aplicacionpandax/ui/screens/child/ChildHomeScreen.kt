@@ -26,6 +26,8 @@ import com.tesis.aplicacionpandax.data.entity.Specialist
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.games.MemoryGame
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
+import com.tesis.aplicacionpandax.ui.screens.game.EmotionsGame
+import com.tesis.aplicacionpandax.ui.screens.game.GamesMenuScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -70,20 +72,40 @@ fun ChildHomeScreen(
                 ChildHomeSection(child, specialist)
             }
             composable("games") {
-                if (child != null) {
-                    MemoryGame(
-                        childUserId = child.userId,
-                        progressRepo = progressRepo, // Mantener para que MemoryGame guarde la sesión
-                        onGameEnd = { score, timeTaken, attempts ->
-                            // Eliminar el guardado duplicado aquí
-                            // Solo loguear o notificar si es necesario
-                            Log.d("ChildHomeScreen", "Juego terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
-                            // Puedes agregar feedback UI aquí si quieres, ej. mostrar un snackbar
+                GamesMenuScreen(child = child, navController = navController)
+            }
+            composable("memory_game/{childUserId}") { backStackEntry ->
+                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
+                MemoryGame(
+                    childUserId = childUserId,
+                    progressRepo = progressRepo,
+                    onGameEnd = { score, timeTaken, attempts ->
+                        Log.d("ChildHomeScreen", "Juego de Memoria terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
+                        scope.launch {
+                            progressRepo.saveSession(
+                                GameSession(
+                                    childUserId = childUserId,
+                                    gameType = "MEMORY",
+                                    score = score,
+                                    timeTaken = timeTaken,
+                                    attempts = attempts,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                            )
                         }
-                    )
-                } else {
-                    Text("No se encontró información del niño.")
-                }
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable("emotions_game/{childUserId}") { backStackEntry ->
+                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
+                EmotionsGame(
+                    childUserId = childUserId,
+                    onSessionComplete = { session ->
+                        scope.launch { progressRepo.saveSession(session) }
+                        navController.popBackStack()
+                    }
+                )
             }
             composable("progress") {
                 ChildProgressScreen(child, progressRepo)

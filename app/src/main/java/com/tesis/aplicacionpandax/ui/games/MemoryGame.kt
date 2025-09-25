@@ -17,9 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.tesis.aplicacionpandax.R
-import com.tesis.aplicacionpandax.data.entity.GameSession
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -29,7 +30,7 @@ import kotlin.random.Random
 fun MemoryGame(
     childUserId: Long,
     progressRepo: ProgressRepository,
-    onGameEnd: (score: Int, timeTaken: Long, attempts: Int) -> Unit
+    onGameEnd: (Int, Long, Int) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -51,7 +52,6 @@ fun MemoryGame(
     var gameFinished by remember { mutableStateOf(false) }
     var stars by remember { mutableStateOf(0) }
     var isProcessing by remember { mutableStateOf(false) }
-    var hasSavedSession by remember { mutableStateOf(false) }
 
     // Estado del modal de inicio
     var showInstructions by remember { mutableStateOf(true) }
@@ -62,10 +62,12 @@ fun MemoryGame(
 
     // Actualizar cronómetro cada segundo
     LaunchedEffect(gameFinished, showInstructions) {
-        while (!gameFinished && !showInstructions) {
-            delay(1000)
+        if (!gameFinished && !showInstructions) {
             startTime?.let {
-                elapsedTime = System.currentTimeMillis() - it
+                while (true) {
+                    delay(1000)
+                    elapsedTime = System.currentTimeMillis() - it
+                }
             }
         }
     }
@@ -75,14 +77,11 @@ fun MemoryGame(
         Log.d("MemoryGame", "Estado: flippedCards=$flippedCards, matchedCards=$matchedCards, matchedCards.size=${matchedCards.size}, cards.size=${cards.size}, attempts=$attempts, gameFinished=$gameFinished")
     }
 
-    // Guardar sesión cuando el juego termina
-    LaunchedEffect(gameFinished, matchedCards) {
+    // Detectar fin del juego y calcular estrellas
+    LaunchedEffect(matchedCards) {
         if (matchedCards.size == cards.size && !gameFinished) {
             Log.d("MemoryGame", "Juego terminado: matchedCards.size=${matchedCards.size}, cards.size=${cards.size}")
             gameFinished = true
-        }
-        if (gameFinished && !hasSavedSession) {
-            Log.d("MemoryGame", "Iniciando guardado de sesión, hasSavedSession=$hasSavedSession")
             val durationSeconds = (elapsedTime / 1000).toInt()
             val pairs = cards.size / 2
 
@@ -92,27 +91,6 @@ fun MemoryGame(
                 attempts <= pairs * 3 && durationSeconds <= 60 -> 2
                 else -> 1
             }
-
-            // Guardar en Room
-            try {
-                progressRepo.saveSession(
-                    GameSession(
-                        sessionId = 0L, // Room genera el ID automáticamente
-                        childUserId = childUserId,
-                        gameType = "MEMORY",
-                        score = stars,
-                        timeTaken = elapsedTime,
-                        attempts = attempts
-                    )
-                )
-                Log.d("MemoryGame", "Sesión guardada: stars=$stars, time=$elapsedTime, attempts=$attempts")
-                hasSavedSession = true
-            } catch (e: Exception) {
-                Log.e("MemoryGame", "Error al guardar sesión: ${e.message}")
-            }
-
-            // Notificar fin del juego
-            onGameEnd(stars, elapsedTime, attempts)
 
             // Reproducir sonido de finalización
             soundPool.play(soundComplete, 1f, 1f, 0, 0, 1f)
@@ -127,15 +105,24 @@ fun MemoryGame(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "🎮 Juego de Memoria",
-            style = MaterialTheme.typography.headlineMedium
+            text = "🎮 Juego de Memoria",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.semantics { contentDescription = "Título del Juego de Memoria" }
         )
         Spacer(modifier = Modifier.height(16.dp))
 
         if (!showInstructions) {
             // Mostrar datos del juego
-            Text("Intentos: $attempts", style = MaterialTheme.typography.bodyLarge)
-            Text("Tiempo: ${elapsedTime / 1000} s", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "Intentos: $attempts",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.semantics { contentDescription = "Intentos: $attempts" }
+            )
+            Text(
+                text = "Tiempo: ${elapsedTime / 1000} s",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.semantics { contentDescription = "Tiempo transcurrido: ${elapsedTime / 1000} segundos" }
+            )
             Spacer(modifier = Modifier.height(16.dp))
 
             // Tablero 2x4
@@ -200,15 +187,20 @@ fun MemoryGame(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "🎉 ¡Felicidades! Has completado en $attempts intentos",
-                        style = MaterialTheme.typography.headlineMedium
+                        text = "🎉 ¡Felicidades! Has completado en $attempts intentos",
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.semantics { contentDescription = "Mensaje de finalización: Completado en $attempts intentos" }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Estrellas obtenidas
                     Row {
                         repeat(stars) {
-                            Text("⭐", style = MaterialTheme.typography.headlineLarge)
+                            Text(
+                                text = "⭐",
+                                style = MaterialTheme.typography.headlineLarge,
+                                modifier = Modifier.semantics { contentDescription = "Estrella obtenida" }
+                            )
                         }
                     }
 
@@ -220,23 +212,18 @@ fun MemoryGame(
                             2 -> "Muy bien, pero puedes mejorar ⏳"
                             else -> "¡Sigue practicando, lo importante es completar! 💪"
                         },
-                        style = MaterialTheme.typography.bodyLarge
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.semantics { contentDescription = "Mensaje de retroalimentación por estrellas" }
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Button(onClick = {
-                        flippedCards = emptyList()
-                        matchedCards = emptySet()
-                        attempts = 0
-                        gameFinished = false
-                        elapsedTime = 0L
-                        stars = 0
-                        hasSavedSession = false
-                        showInstructions = true
-                        cards.shuffle(Random(System.currentTimeMillis()))
-                        Log.d("MemoryGame", "Juego reiniciado")
-                    }) {
-                        Text("Reiniciar")
+                    Button(
+                        onClick = {
+                            onGameEnd(stars, elapsedTime, attempts)
+                        },
+                        modifier = Modifier.semantics { contentDescription = "Botón para volver al menú de juegos" }
+                    ) {
+                        Text("Volver al Menú")
                     }
                 }
             }
@@ -248,22 +235,41 @@ fun MemoryGame(
         AlertDialog(
             onDismissRequest = { },
             confirmButton = {
-                Button(onClick = {
-                    showInstructions = false
-                    startTime = System.currentTimeMillis()
-                    Log.d("MemoryGame", "Juego iniciado")
-                }) {
+                Button(
+                    onClick = {
+                        showInstructions = false
+                        startTime = System.currentTimeMillis()
+                        Log.d("MemoryGame", "Juego iniciado")
+                    },
+                    modifier = Modifier.semantics { contentDescription = "Botón para comenzar el juego" }
+                ) {
                     Text("Comenzar ▶️")
                 }
             },
             title = { Text("📖 Instrucciones") },
             text = {
                 Column {
-                    Text("Encuentra los pares de cartas iguales.", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = "Encuentra los pares de cartas iguales.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.semantics { contentDescription = "Instrucción: Encuentra los pares de cartas iguales" }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("⭐ 3 estrellas → Rápido (≤30s) y pocos intentos", style = MaterialTheme.typography.bodyMedium)
-                    Text("⭐ 2 estrellas → Tiempo ≤60s o algunos intentos extra", style = MaterialTheme.typography.bodyMedium)
-                    Text("⭐ 1 estrella → Completado con más intentos/tiempo", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "⭐ 3 estrellas → Rápido (≤30s) y pocos intentos",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.semantics { contentDescription = "Instrucción: 3 estrellas por rapidez y pocos intentos" }
+                    )
+                    Text(
+                        text = "⭐ 2 estrellas → Tiempo ≤60s o algunos intentos extra",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.semantics { contentDescription = "Instrucción: 2 estrellas por tiempo moderado o más intentos" }
+                    )
+                    Text(
+                        text = "⭐ 1 estrella → Completado con más intentos/tiempo",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.semantics { contentDescription = "Instrucción: 1 estrella por completar con más intentos o tiempo" }
+                    )
                 }
             }
         )
@@ -279,7 +285,12 @@ fun MemoryGame(
 }
 
 @Composable
-fun MemoryCard(content: String, visible: Boolean, isMatched: Boolean, onClick: () -> Unit) {
+fun MemoryCard(
+    content: String,
+    visible: Boolean,
+    isMatched: Boolean,
+    onClick: () -> Unit
+) {
     // Animación de giro
     val rotation by animateFloatAsState(
         targetValue = if (visible) 0f else 180f,
@@ -294,11 +305,16 @@ fun MemoryCard(content: String, visible: Boolean, isMatched: Boolean, onClick: (
                 color = if (isMatched) Color.Green else if (visible) Color.Cyan else Color.Gray,
                 shape = RoundedCornerShape(8.dp)
             )
-            .clickable { onClick() },
+            .clickable { onClick() }
+            .semantics { contentDescription = if (visible) "Carta visible: $content" else "Carta oculta" },
         contentAlignment = Alignment.Center
     ) {
         if (visible) {
-            Text(text = content, style = MaterialTheme.typography.headlineLarge)
+            Text(
+                text = content,
+                style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.semantics { contentDescription = "Emoji de la carta: $content" }
+            )
         }
     }
 }

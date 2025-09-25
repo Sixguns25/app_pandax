@@ -75,6 +75,8 @@ dependencies {
 
     implementation("androidx.compose.material3:material3:1.3.0") // Para MaterialTheme y AlertDialog
 
+    implementation("androidx.compose.animation:animation")
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

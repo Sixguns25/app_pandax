@@ -28,7 +28,7 @@ fun ChildProgressScreen(
     var sessions by remember { mutableStateOf<List<GameSession>>(emptyList()) }
     var averageStars by remember { mutableStateOf(0.0f) }
     var selectedGameType by remember { mutableStateOf("Todos") }
-    val gameTypes = listOf("Todos", "MEMORY") // Agregar más tipos cuando existan
+    val gameTypes = listOf("Todos", "MEMORY", "EMOTIONS") // Incluye ambos juegos
 
     // Cargar sesiones en tiempo real
     LaunchedEffect(child?.userId, selectedGameType) {
