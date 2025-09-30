@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface SpecialtyDao {
     @Insert
-    suspend fun insert(specialty: Specialty)
+    suspend fun insert(specialty: Specialty): Long
 
     @Update
     suspend fun update(specialty: Specialty)

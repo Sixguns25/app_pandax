@@ -12,8 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Database(
-    entities = [User::class, Specialist::class, Child::class, GameSession::class, Specialty::class],
-    version = 4,
+    entities = [User::class, Specialist::class, Child::class, GameSession::class, Specialty::class, Game::class, SpecialtyGame::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,6 +23,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun childDao(): ChildDao
     abstract fun gameSessionDao(): GameSessionDao
     abstract fun specialtyDao(): SpecialtyDao
+    abstract fun gameDao(): GameDao
+    abstract fun specialtyGameDao(): SpecialtyGameDao
 
     companion object {
         @Volatile
@@ -58,7 +60,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Crea tabla temporal con la nueva estructura
                 db.execSQL("""
                     CREATE TABLE specialists_new (
                         userId INTEGER PRIMARY KEY NOT NULL,
@@ -71,15 +72,34 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(specialtyId) REFERENCES specialties(id) ON DELETE CASCADE
                     )
                 """.trimIndent())
-                // Copia datos existentes, asigna specialtyId=1 (Conducta) por defecto
                 db.execSQL("""
                     INSERT INTO specialists_new (userId, firstName, lastName, phone, email, specialtyId)
                     SELECT userId, firstName, lastName, phone, email, 1 FROM specialists
                 """.trimIndent())
-                // Elimina tabla antigua
                 db.execSQL("DROP TABLE specialists")
-                // Renombra tabla nueva
                 db.execSQL("ALTER TABLE specialists_new RENAME TO specialists")
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `games` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `displayName` TEXT NOT NULL,
+                        `route` TEXT NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `specialty_games` (
+                        `specialtyId` INTEGER NOT NULL,
+                        `gameId` INTEGER NOT NULL,
+                        PRIMARY KEY(`specialtyId`, `gameId`),
+                        FOREIGN KEY(`specialtyId`) REFERENCES `specialties`(`id`) ON DELETE CASCADE,
+                        FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
             }
         }
 
@@ -90,7 +110,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "app_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .addCallback(DatabaseCallback(scope)).build()
                 INSTANCE = instance
                 instance
@@ -117,15 +137,38 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                     // Inserta especialidades iniciales
                     val specialtyDao = database.specialtyDao()
-                    listOf(
+                    val specialtyIds = listOf(
                         "Conducta",
                         "Fonoaudiología",
                         "Lenguaje",
                         "Educación",
                         "Terapia de motricidad"
-                    ).forEach { name ->
+                    ).map { name ->
                         specialtyDao.insert(Specialty(name = name))
                     }
+                    // Inserta juegos
+                    val gameDao = database.gameDao()
+                    val specialtyGameDao = database.specialtyGameDao()
+
+                    // Juegos reales
+                    val memoryId = gameDao.insert(Game(name = "MEMORY", displayName = "Juego de Memoria", route = "memory_game/{childUserId}"))
+                    val emotionsId = gameDao.insert(Game(name = "EMOTIONS", displayName = "Juego de Emociones", route = "emotions_game/{childUserId}"))
+                    val coordinationId = gameDao.insert(Game(name = "COORDINATION", displayName = "Juego de Coordinación", route = "coordination_game/{childUserId}"))
+                    val pronunciationId = gameDao.insert(Game(name = "PRONUNCIATION", displayName = "Juego de Pronunciación", route = "pronunciation_game/{childUserId}"))
+
+                    // Asignaciones a especialidades
+                    // Conducta (specialtyIds[0]): MEMORY, EMOTIONS
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[0], gameId = memoryId))
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[0], gameId = emotionsId))
+                    // Fonoaudiología (specialtyIds[1]): EMOTIONS
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[1], gameId = emotionsId))
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[1], gameId = pronunciationId))
+                    // Lenguaje (specialtyIds[2]): EMOTIONS
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[2], gameId = emotionsId))
+                    // Educación (specialtyIds[3]): MEMORY
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[3], gameId = memoryId))
+                    // Terapia de motricidad (specialtyIds[4]): COORDINATION
+                    specialtyGameDao.insert(SpecialtyGame(specialtyId = specialtyIds[4], gameId = coordinationId))
                 }
             }
         }

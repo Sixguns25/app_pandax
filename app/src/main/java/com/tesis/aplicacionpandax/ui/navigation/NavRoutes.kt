@@ -17,6 +17,7 @@ sealed class NavRoutes(val route: String) {
 
     // Child
     object ChildHome : NavRoutes("child_home")
+    object Games : NavRoutes("games")
 
     // Rutas comunes
     object ChildDetail : NavRoutes("child_detail/{childId}")

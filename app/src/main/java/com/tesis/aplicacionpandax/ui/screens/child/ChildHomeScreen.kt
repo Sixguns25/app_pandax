@@ -13,8 +13,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -25,10 +29,11 @@ import com.tesis.aplicacionpandax.data.entity.Child
 import com.tesis.aplicacionpandax.data.entity.GameSession
 import com.tesis.aplicacionpandax.data.entity.Specialist
 import com.tesis.aplicacionpandax.repository.ProgressRepository
+import com.tesis.aplicacionpandax.ui.games.CoordinationGame
 import com.tesis.aplicacionpandax.ui.games.MemoryGame
+import com.tesis.aplicacionpandax.ui.games.PronunciationGame
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
 import com.tesis.aplicacionpandax.ui.screens.game.EmotionsGame
-import com.tesis.aplicacionpandax.ui.screens.game.GamesMenuScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -48,6 +53,12 @@ fun ChildHomeScreen(
         BottomNavItem("progress", "Progreso", Icons.Default.Check),
         BottomNavItem("profile", "Perfil", Icons.Default.Person)
     )
+
+    // Extrae specialtyId del especialista para pasarlo a GamesMenuScreen
+    var specialtyId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(specialist) {
+        specialtyId = specialist?.specialtyId
+    }
 
     Scaffold(
         bottomBar = {
@@ -74,7 +85,12 @@ fun ChildHomeScreen(
                 ChildHomeSection(child, specialist, db)
             }
             composable("games") {
-                GamesMenuScreen(child = child, navController = navController)
+                GamesMenuScreen(
+                    child = child,
+                    specialtyId = specialtyId,
+                    navController = navController,
+                    progressRepo = progressRepo
+                )
             }
             composable("memory_game/{childUserId}") { backStackEntry ->
                 val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
@@ -105,6 +121,52 @@ fun ChildHomeScreen(
                     childUserId = childUserId,
                     onSessionComplete = { session ->
                         scope.launch { progressRepo.saveSession(session) }
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable("coordination_game/{childUserId}") { backStackEntry ->
+                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
+                CoordinationGame(
+                    childUserId = childUserId,
+                    progressRepo = progressRepo,
+                    onGameEnd = { score, timeTaken, attempts ->
+                        Log.d("ChildHomeScreen", "Juego de Coordinación terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
+                        scope.launch {
+                            progressRepo.saveSession(
+                                GameSession(
+                                    childUserId = childUserId,
+                                    gameType = "COORDINATION",
+                                    score = score,
+                                    timeTaken = timeTaken,
+                                    attempts = attempts,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable("pronunciation_game/{childUserId}") { backStackEntry ->
+                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
+                PronunciationGame(
+                    childUserId = childUserId,
+                    progressRepo = progressRepo,
+                    onGameEnd = { score, timeTaken, attempts ->
+                        Log.d("ChildHomeScreen", "Juego de Pronunciación terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
+                        scope.launch {
+                            progressRepo.saveSession(
+                                GameSession(
+                                    childUserId = childUserId,
+                                    gameType = "PRONUNCIATION",
+                                    score = score,
+                                    timeTaken = timeTaken,
+                                    attempts = attempts,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                            )
+                        }
                         navController.popBackStack()
                     }
                 )

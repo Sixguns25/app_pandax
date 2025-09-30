@@ -1,6 +1,7 @@
 package com.tesis.aplicacionpandax.repository
 
 import com.tesis.aplicacionpandax.data.AppDatabase
+import com.tesis.aplicacionpandax.data.entity.Game
 import com.tesis.aplicacionpandax.data.entity.GameSession
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,6 +15,7 @@ data class ProgressSummary(
 
 class ProgressRepository(private val db: AppDatabase) {
     private val dao = db.gameSessionDao()
+    private val specialtyGameDao = db.specialtyGameDao() // Nueva referencia al SpecialtyGameDao
 
     suspend fun saveSession(session: GameSession) {
         dao.insert(session)
@@ -54,5 +56,10 @@ class ProgressRepository(private val db: AppDatabase) {
                 averageAttempts = if (sessions.isNotEmpty()) sessions.map { it.attempts.toFloat() }.average().toFloat() else 0f
             )
         }
+    }
+
+    // Nuevo: Obtener juegos para una especialidad
+    fun getGamesForSpecialty(specialtyId: Long): Flow<List<Game>> {
+        return specialtyGameDao.getGamesForSpecialty(specialtyId)
     }
 }
