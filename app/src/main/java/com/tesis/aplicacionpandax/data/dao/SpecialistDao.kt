@@ -14,10 +14,10 @@ interface SpecialistDao {
     suspend fun insert(specialist: Specialist)
 
     @Update
-    suspend fun update(specialist: Specialist)  // Nuevo para Update
+    suspend fun update(specialist: Specialist)
 
     @Delete
-    suspend fun delete(specialist: Specialist)  // Nuevo para Delete
+    suspend fun delete(specialist: Specialist)
 
     @Query("SELECT * FROM specialists WHERE userId = :userId")
     suspend fun getByUserId(userId: Long): Specialist?

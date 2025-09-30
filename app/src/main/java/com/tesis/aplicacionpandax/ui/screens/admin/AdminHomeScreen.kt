@@ -13,6 +13,7 @@ fun AdminHomeScreen(
     onRegisterChild: () -> Unit,
     onManageSpecialties: () -> Unit,
     onManageSpecialists: () -> Unit,
+    onManageChildren: () -> Unit, // Nueva lambda
     onLogout: () -> Unit
 ) {
     Column(
@@ -44,7 +45,7 @@ fun AdminHomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = onManageSpecialties, // Nuevo botón
+            onClick = onManageSpecialties,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Gestionar Especialidades")
@@ -53,10 +54,19 @@ fun AdminHomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = onManageSpecialists, // Nuevo botón
+            onClick = onManageSpecialists,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Gestionar Especialistas")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onManageChildren, // Nuevo botón
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Gestionar Niños")
         }
 
         Spacer(modifier = Modifier.height(16.dp))

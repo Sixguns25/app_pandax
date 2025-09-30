@@ -1,4 +1,4 @@
-package com.tesis.aplicacionpandax.ui.screens.specialist
+package com.tesis.aplicacionpandax.ui.screens.admin
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.tesis.aplicacionpandax.data.AppDatabase
-import com.tesis.aplicacionpandax.data.entity.Child
+import com.tesis.aplicacionpandax.data.dao.ChildWithSpecialist
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.ui.components.ChildCard
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
@@ -22,18 +22,17 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
-fun SpecialistChildrenScreen(
+fun AdminChildrenScreen(
     db: AppDatabase,
     repo: AuthRepository,
     navController: NavController,
-    specialistId: Long,
-    childrenFlow: Flow<List<Child>>
+    childrenFlow: Flow<List<ChildWithSpecialist>> // Cambiado a ChildWithSpecialist
 ) {
     val coroutineScope = rememberCoroutineScope()
     val children by childrenFlow.collectAsState(initial = emptyList())
     var message by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    var showDeleteDialog by remember { mutableStateOf<Child?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<ChildWithSpecialist?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
     // Mostrar mensaje en Snackbar
@@ -52,13 +51,13 @@ fun SpecialistChildrenScreen(
         AlertDialog(
             onDismissRequest = { if (!isLoading) showDeleteDialog = null },
             title = { Text("Confirmar Eliminación") },
-            text = { Text("¿Seguro que quieres eliminar a ${showDeleteDialog!!.firstName} ${showDeleteDialog!!.lastName}?") },
+            text = { Text("¿Seguro que quieres eliminar a ${showDeleteDialog!!.child.firstName} ${showDeleteDialog!!.child.lastName}?") },
             confirmButton = {
                 Button(
                     onClick = {
                         coroutineScope.launch {
                             isLoading = true
-                            val result = repo.deleteChild(showDeleteDialog!!.userId)
+                            val result = repo.deleteChild(showDeleteDialog!!.child.userId)
                             isLoading = false
                             result.onSuccess {
                                 message = "Niño eliminado correctamente ✅"
@@ -86,7 +85,7 @@ fun SpecialistChildrenScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Gestionar Niños Asignados",
+                        "Gestionar Niños",
                         style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 },
@@ -115,7 +114,7 @@ fun SpecialistChildrenScreen(
 
                     // Botón para registrar nuevo niño
                     Button(
-                        onClick = { navController.navigate(NavRoutes.SpecialistRegisterChild.route) },
+                        onClick = { navController.navigate(NavRoutes.RegisterChild.route) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp),
@@ -131,7 +130,7 @@ fun SpecialistChildrenScreen(
 
                     // Subtítulo
                     Text(
-                        "Mis Niños",
+                        "Todos los Niños",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -144,7 +143,7 @@ fun SpecialistChildrenScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "No hay niños asignados",
+                                "No hay niños registrados",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
@@ -153,37 +152,37 @@ fun SpecialistChildrenScreen(
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(children, key = { it.userId }) { child ->
+                            items(children, key = { it.child.userId }) { childWithSpecialist ->
                                 AnimatedVisibility(
                                     visible = true,
                                     enter = fadeIn() + slideInVertically(),
                                     exit = fadeOut() + slideOutVertically()
                                 ) {
                                     ChildCard(
-                                        child = child,
-                                        specialistName = "Asignado a mí",
+                                        child = childWithSpecialist.child,
+                                        specialistName = childWithSpecialist.specialistName,
                                         onEdit = {
-                                            if (child.userId > 0) {
-                                                navController.navigate("${NavRoutes.SpecialistRegisterChild.route}/${child.userId}")
+                                            if (childWithSpecialist.child.userId > 0) {
+                                                navController.navigate("${NavRoutes.RegisterChild.route}/${childWithSpecialist.child.userId}")
                                             } else {
                                                 message = "Error: ID de niño inválido"
                                             }
                                         },
                                         onDetail = {
-                                            if (child.userId > 0) {
-                                                navController.navigate("child_detail/${child.userId}")
+                                            if (childWithSpecialist.child.userId > 0) {
+                                                navController.navigate("child_detail/${childWithSpecialist.child.userId}")
                                             } else {
                                                 message = "Error: ID de niño inválido"
                                             }
                                         },
                                         onProgress = {
-                                            if (child.userId > 0) {
-                                                navController.navigate("child_progress/${child.userId}")
+                                            if (childWithSpecialist.child.userId > 0) {
+                                                navController.navigate("child_progress/${childWithSpecialist.child.userId}")
                                             } else {
                                                 message = "Error: ID de niño inválido"
                                             }
                                         },
-                                        onDelete = { showDeleteDialog = child },
+                                        onDelete = { showDeleteDialog = childWithSpecialist },
                                         enabled = !isLoading
                                     )
                                 }

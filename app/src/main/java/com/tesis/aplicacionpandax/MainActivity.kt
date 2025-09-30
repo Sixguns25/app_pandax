@@ -16,17 +16,21 @@ import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.viewmodel.AuthViewModel
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
+import com.tesis.aplicacionpandax.ui.screens.admin.AdminChildrenScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.AdminHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterSpecialistScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.SpecialtiesManagementScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.SpecialistsManagementScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.SpecialistDetailScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.ChildDetailScreen
 import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.common.LoginScreen
 import com.tesis.aplicacionpandax.ui.screens.specialist.SpecialistHomeScreen
+import com.tesis.aplicacionpandax.ui.screens.specialist.ChildProgressDetailScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -50,10 +54,12 @@ class MainActivity : ComponentActivity() {
 
             val navController = rememberNavController()
             var loggedUserId by remember { mutableStateOf<Long?>(null) }
+            val coroutineScope = rememberCoroutineScope()
 
             // Flujos de datos
             val specialistsFlow = db.specialistDao().getAll()
             val specialists by specialistsFlow.collectAsState(initial = emptyList())
+            val childrenFlow = db.childDao().getAllWithSpecialist()
 
             NavHost(
                 navController = navController,
@@ -76,8 +82,9 @@ class MainActivity : ComponentActivity() {
                     AdminHomeScreen(
                         onRegisterSpecialist = { navController.navigate(NavRoutes.RegisterSpecialist.route) },
                         onRegisterChild = { navController.navigate(NavRoutes.RegisterChild.route) },
-                        onManageSpecialties = { navController.navigate("manage_specialties") },
-                        onManageSpecialists = { navController.navigate("manage_specialists") },
+                        onManageSpecialties = { navController.navigate(NavRoutes.ManageSpecialties.route) },
+                        onManageSpecialists = { navController.navigate(NavRoutes.ManageSpecialists.route) },
+                        onManageChildren = { navController.navigate(NavRoutes.ManageChildren.route) },
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -90,7 +97,7 @@ class MainActivity : ComponentActivity() {
                     RegisterSpecialistScreen(
                         repo = authRepo,
                         db = db,
-                        specialistId = -1L, // Creación
+                        specialistId = -1L,
                         onBack = { navController.popBackStack() }
                     )
                 }
@@ -113,17 +120,37 @@ class MainActivity : ComponentActivity() {
                         onBack = { navController.popBackStack() }
                     )
                 }
-                composable("manage_specialties") {
+                composable(
+                    route = "${NavRoutes.RegisterChild.route}/{childId}",
+                    arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
+                ) { backStackEntry ->
+                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                    RegisterChildScreen(
+                        repo = authRepo,
+                        specialists = specialists,
+                        onBack = { navController.popBackStack() },
+                        childId = childId
+                    )
+                }
+                composable(NavRoutes.ManageSpecialties.route) {
                     SpecialtiesManagementScreen(
                         db = db,
                         onBack = { navController.popBackStack() }
                     )
                 }
-                composable("manage_specialists") {
+                composable(NavRoutes.ManageSpecialists.route) {
                     SpecialistsManagementScreen(
                         db = db,
                         repo = authRepo,
                         navController = navController
+                    )
+                }
+                composable(NavRoutes.ManageChildren.route) {
+                    AdminChildrenScreen(
+                        db = db,
+                        repo = authRepo,
+                        navController = navController,
+                        childrenFlow = childrenFlow
                     )
                 }
                 composable(
@@ -137,6 +164,27 @@ class MainActivity : ComponentActivity() {
                         specialistId = specialistId
                     )
                 }
+                composable(
+                    route = "child_detail/{childId}",
+                    arguments = listOf(navArgument("childId") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                    ChildDetailScreen(
+                        navController = navController,
+                        db = db,
+                        childId = childId
+                    )
+                }
+                composable(
+                    route = "child_progress/{childId}",
+                    arguments = listOf(navArgument("childId") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                    ChildProgressDetailScreen(
+                        childUserId = childId,
+                        progressRepo = progressRepo
+                    )
+                }
 
                 // Specialist
                 composable(NavRoutes.SpecialistHome.route) {
@@ -144,6 +192,7 @@ class MainActivity : ComponentActivity() {
                         specialistId = loggedUserId ?: -1,
                         childrenFlow = db.childDao().getChildrenForSpecialist(loggedUserId ?: -1),
                         progressRepo = progressRepo,
+                        db = db,
                         onLogout = {
                             loggedUserId = null
                             navController.navigate(NavRoutes.Login.route) {
@@ -152,7 +201,6 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
-
                 composable(NavRoutes.SpecialistRegisterChild.route) {
                     RegisterChildScreen(
                         repo = authRepo,
@@ -161,14 +209,31 @@ class MainActivity : ComponentActivity() {
                         specialistId = loggedUserId
                     )
                 }
+                composable(
+                    route = "${NavRoutes.SpecialistRegisterChild.route}/{childId}",
+                    arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
+                ) { backStackEntry ->
+                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                    RegisterChildScreen(
+                        repo = authRepo,
+                        specialists = specialists,
+                        onBack = { navController.popBackStack() },
+                        specialistId = loggedUserId,
+                        childId = childId
+                    )
+                }
 
                 // Child
                 composable(NavRoutes.ChildHome.route) {
                     val childFlow = db.childDao().getChildByUserId(loggedUserId ?: -1)
                     val child by childFlow.collectAsState(initial = null)
+                    var specialist by remember { mutableStateOf<com.tesis.aplicacionpandax.data.entity.Specialist?>(null) }
 
-                    val specialistFlow = db.specialistDao().getById(child?.specialistId ?: -1)
-                    val specialist by specialistFlow.collectAsState(initial = null)
+                    LaunchedEffect(child?.specialistId) {
+                        child?.specialistId?.let { specialistId ->
+                            specialist = db.specialistDao().getByUserId(specialistId)
+                        }
+                    }
 
                     ChildHomeScreen(
                         child = child,

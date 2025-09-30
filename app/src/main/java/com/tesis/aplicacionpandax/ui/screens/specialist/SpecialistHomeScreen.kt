@@ -15,17 +15,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Child
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
+import com.tesis.aplicacionpandax.ui.screens.admin.ChildDetailScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
 import kotlinx.coroutines.flow.Flow
 
@@ -33,10 +35,12 @@ import kotlinx.coroutines.flow.Flow
 fun SpecialistHomeScreen(
     specialistId: Long,
     childrenFlow: Flow<List<Child>>,
-    progressRepo: ProgressRepository, // Agregar parámetro
+    progressRepo: ProgressRepository,
+    db: AppDatabase,
     onLogout: () -> Unit
 ) {
     val navController = rememberNavController()
+    val authRepository = AuthRepository(db) // Instancia única
 
     val items = listOf(
         BottomNavItem("children", "Hijos", Icons.Default.List),
@@ -67,8 +71,11 @@ fun SpecialistHomeScreen(
         ) {
             composable("children") {
                 SpecialistChildrenScreen(
-                    childrenFlow = childrenFlow,
-                    navController = navController // Pasar navController
+                    db = db,
+                    repo = authRepository,
+                    navController = navController,
+                    specialistId = specialistId,
+                    childrenFlow = childrenFlow
                 )
             }
             composable("profile") {
@@ -81,16 +88,39 @@ fun SpecialistHomeScreen(
                 val childId = backStackEntry.arguments?.getString("childId")?.toLong() ?: -1
                 ChildProgressDetailScreen(
                     childUserId = childId,
-                    progressRepo = progressRepo // Usar progressRepo pasado
+                    progressRepo = progressRepo
                 )
             }
-            // Nueva ruta para registrar niños
             composable(NavRoutes.SpecialistRegisterChild.route) {
                 RegisterChildScreen(
-                    repo = AuthRepository(AppDatabase.getInstance(LocalContext.current, rememberCoroutineScope())),
-                    specialists = emptyList(), // No necesitamos lista de especialistas aquí
+                    repo = authRepository,
+                    specialists = emptyList(),
                     onBack = { navController.popBackStack() },
-                    specialistId = specialistId // Pasamos el ID del especialista
+                    specialistId = specialistId
+                )
+            }
+            composable(
+                route = "${NavRoutes.SpecialistRegisterChild.route}/{childId}",
+                arguments = listOf(navArgument("childId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                RegisterChildScreen(
+                    repo = authRepository,
+                    specialists = emptyList(),
+                    onBack = { navController.popBackStack() },
+                    specialistId = specialistId,
+                    childId = childId
+                )
+            }
+            composable(
+                route = "child_detail/{childId}",
+                arguments = listOf(navArgument("childId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                ChildDetailScreen(
+                    navController = navController,
+                    db = db,
+                    childId = childId
                 )
             }
         }

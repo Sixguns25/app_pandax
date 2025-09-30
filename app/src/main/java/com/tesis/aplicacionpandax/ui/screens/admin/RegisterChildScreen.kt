@@ -23,7 +23,8 @@ fun RegisterChildScreen(
     repo: AuthRepository,
     specialists: List<Specialist>,
     onBack: () -> Unit,
-    specialistId: Long? = null
+    specialistId: Long? = null,
+    childId: Long? = null  // Agregado para modo edición
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -51,6 +52,28 @@ fun RegisterChildScreen(
     // Opciones para el desplegable de sexo
     val sexOptions = listOf("Masculino" to "M", "Femenino" to "F")
 
+    // Cargar datos si es modo edición
+    LaunchedEffect(childId) {
+        if (childId != null) {
+            val db = AppDatabase.getInstance(context, scope)
+            val child = db.childDao().getByUserId(childId)
+            val user = db.userDao().getById(childId)
+            if (child != null && user != null) {
+                username = user.username
+                firstName = child.firstName
+                lastName = child.lastName
+                dni = child.dni
+                condition = child.condition
+                sex = child.sex
+                sexDisplay = if (child.sex == "M") "Masculino" else if (child.sex == "F") "Femenino" else ""
+                birthDateMillis = child.birthDateMillis
+                guardianName = child.guardianName
+                guardianPhone = child.guardianPhone
+                selectedSpecialistId = child.specialistId ?: specialistId
+            }
+        }
+    }
+
     // Obtener nombre del especialista si specialistId no es null
     var specialistName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(specialistId) {
@@ -64,7 +87,7 @@ fun RegisterChildScreen(
 
     // Validaciones
     fun validateInputs(): String? {
-        if (username.isBlank() || password.isBlank() || firstName.isBlank() || lastName.isBlank() ||
+        if (username.isBlank() || firstName.isBlank() || lastName.isBlank() ||
             dni.isBlank() || condition.isBlank() || sex.isBlank() || guardianName.isBlank() || guardianPhone.isBlank()
         ) {
             return "Por favor, completa todos los campos"
@@ -75,7 +98,7 @@ fun RegisterChildScreen(
         if (!guardianPhone.matches(Regex("\\d{9,15}"))) {
             return "Teléfono debe tener entre 9 y 15 dígitos"
         }
-        if (password.length < 6) {
+        if ((childId == null && password.isBlank()) || (password.isNotBlank() && password.length < 6)) {
             return "La contraseña debe tener al menos 6 caracteres"
         }
         if (sex !in listOf("M", "F")) {
@@ -98,7 +121,7 @@ fun RegisterChildScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.Top
         ) {
-            Text("Registrar Niño", style = MaterialTheme.typography.headlineMedium)
+            Text(if (childId == null) "Registrar Niño" else "Editar Niño", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(16.dp))
 
             // Sección: Cuenta del Niño
@@ -113,12 +136,13 @@ fun RegisterChildScreen(
                         value = username,
                         onValueChange = { username = it },
                         label = { Text("Usuario") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = childId == null  // No editable en modo edición
                     )
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Contraseña") },
+                        label = { Text(if (childId == null) "Contraseña" else "Nueva Contraseña (opcional)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -270,7 +294,7 @@ fun RegisterChildScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón Registrar
+            // Botón Registrar/Actualizar
             var isLoading by remember { mutableStateOf(false) }
             Button(
                 onClick = {
@@ -283,22 +307,40 @@ fun RegisterChildScreen(
                         }
 
                         isLoading = true
-                        val result = repo.registerChild(
-                            username = username.trim(),
-                            password = password,
-                            firstName = firstName.trim(),
-                            lastName = lastName.trim(),
-                            dni = dni.trim(),
-                            condition = condition.trim(),
-                            sex = sex.trim(),
-                            birthDateMillis = birthDateMillis,
-                            guardianName = guardianName.trim(),
-                            guardianPhone = guardianPhone.trim(),
-                            specialistId = selectedSpecialistId
-                        )
+                        val result = if (childId == null) {
+                            // Registro
+                            repo.registerChild(
+                                username = username.trim(),
+                                password = password,
+                                firstName = firstName.trim(),
+                                lastName = lastName.trim(),
+                                dni = dni.trim(),
+                                condition = condition.trim(),
+                                sex = sex.trim(),
+                                birthDateMillis = birthDateMillis,
+                                guardianName = guardianName.trim(),
+                                guardianPhone = guardianPhone.trim(),
+                                specialistId = selectedSpecialistId
+                            )
+                        } else {
+                            // Actualización
+                            repo.updateChild(
+                                childId = childId,
+                                firstName = firstName.trim(),
+                                lastName = lastName.trim(),
+                                dni = dni.trim(),
+                                condition = condition.trim(),
+                                sex = sex.trim(),
+                                birthDateMillis = birthDateMillis,
+                                guardianName = guardianName.trim(),
+                                guardianPhone = guardianPhone.trim(),
+                                specialistId = selectedSpecialistId,
+                                password = if (password.isNotBlank()) password else null
+                            )
+                        }
                         isLoading = false
                         message = result.fold(
-                            onSuccess = { "Se registró al niño exitosamente ✅" },
+                            onSuccess = { if (childId == null) "Se registró al niño exitosamente ✅" else "Niño actualizado exitosamente ✅" },
                             onFailure = { "Error: ${it.message}" }
                         )
                         snackbarHostState.showSnackbar(message!!)
@@ -313,7 +355,7 @@ fun RegisterChildScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("Registrar")
+                    Text(if (childId == null) "Registrar" else "Actualizar")
                 }
             }
 

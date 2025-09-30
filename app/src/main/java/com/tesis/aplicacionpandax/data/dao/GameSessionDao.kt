@@ -14,6 +14,9 @@ interface GameSessionDao {
     @Query("SELECT * FROM game_sessions WHERE childUserId = :childUserId ORDER BY timestamp DESC")
     fun getSessionsByChild(childUserId: Long): Flow<List<GameSession>>
 
+    @Query("SELECT * FROM game_sessions WHERE childUserId = :childUserId ORDER BY timestamp DESC")
+    suspend fun getSessionsByChildSuspend(childUserId: Long): List<GameSession>
+
     @Query("SELECT * FROM game_sessions WHERE childUserId = :childUserId AND gameType = :gameType ORDER BY timestamp DESC")
     fun getSessionsByChildAndType(childUserId: Long, gameType: String): Flow<List<GameSession>>
 

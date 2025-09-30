@@ -94,7 +94,7 @@ class AuthRepository(private val db: AppDatabase) {
         return Result.success(Unit)
     }
 
-    // 🔹 Registro de niño
+    // 🔹 Registro de niño (Create)
     suspend fun registerChild(
         username: String,
         password: String,
@@ -132,5 +132,62 @@ class AuthRepository(private val db: AppDatabase) {
             )
         )
         return Result.success(id)
+    }
+
+    // 🔹 Actualizar niño (Update)
+    suspend fun updateChild(
+        childId: Long,
+        firstName: String,
+        lastName: String,
+        dni: String,
+        condition: String,
+        sex: String,
+        birthDateMillis: Long,
+        guardianName: String,
+        guardianPhone: String,
+        specialistId: Long?,
+        password: String? = null
+    ): Result<Unit> {
+        val child = childDao.getByUserId(childId)
+            ?: return Result.failure(Exception("Niño no encontrado"))
+        if (specialistId != null && specialistDao.getByUserId(specialistId) == null) {
+            return Result.failure(Exception("Especialista no existe"))
+        }
+        val updatedChild = child.copy(
+            firstName = firstName.trim(),
+            lastName = lastName.trim(),
+            dni = dni.trim(),
+            condition = condition.trim(),
+            sex = sex.trim(),
+            birthDateMillis = birthDateMillis,
+            guardianName = guardianName.trim(),
+            guardianPhone = guardianPhone.trim(),
+            specialistId = specialistId
+        )
+        childDao.update(updatedChild)
+
+        if (password != null && password.isNotBlank()) {
+            val user = userDao.getById(childId)
+                ?: return Result.failure(Exception("Usuario no encontrado"))
+            val (salt, hash) = PasswordUtils.hashPasswordWithSalt(password)
+            val updatedUser = user.copy(passwordHash = hash, salt = salt)
+            userDao.update(updatedUser)
+        }
+        return Result.success(Unit)
+    }
+
+    // 🔹 Eliminar niño (Delete)
+    suspend fun deleteChild(childId: Long): Result<Unit> {
+        val sessions = db.gameSessionDao().getSessionsByChildSuspend(childId)
+        if (sessions.isNotEmpty()) {
+            return Result.failure(Exception("No se puede eliminar, hay sesiones de juego asociadas"))
+        }
+        val child = childDao.getByUserId(childId)
+            ?: return Result.failure(Exception("Niño no encontrado"))
+        val user = userDao.getById(childId)
+            ?: return Result.failure(Exception("Usuario no encontrado"))
+        childDao.delete(child)
+        userDao.delete(user)
+        return Result.success(Unit)
     }
 }
