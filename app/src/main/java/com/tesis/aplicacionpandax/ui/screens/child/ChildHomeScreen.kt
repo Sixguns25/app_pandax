@@ -33,6 +33,10 @@ import com.tesis.aplicacionpandax.ui.games.CoordinationGame
 import com.tesis.aplicacionpandax.ui.games.MemoryGame
 import com.tesis.aplicacionpandax.ui.games.PronunciationGame
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
+import com.tesis.aplicacionpandax.ui.screens.child.ChildProgressScreen
+import com.tesis.aplicacionpandax.ui.screens.child.ChildProfileScreen
+import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeSection
+import com.tesis.aplicacionpandax.ui.screens.child.GamesMenuScreen
 import com.tesis.aplicacionpandax.ui.screens.game.EmotionsGame
 import kotlinx.coroutines.launch
 
@@ -172,7 +176,11 @@ fun ChildHomeScreen(
                 )
             }
             composable("progress") {
-                ChildProgressScreen(child, progressRepo)
+                ChildProgressScreen(
+                    child = child,
+                    specialtyId = specialtyId,  // Añadido para filtrar progreso por juegos disponibles
+                    progressRepo = progressRepo
+                )
             }
             composable("profile") {
                 ChildProfileScreen(child, onLogout)

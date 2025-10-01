@@ -15,7 +15,7 @@ data class ProgressSummary(
 
 class ProgressRepository(private val db: AppDatabase) {
     private val dao = db.gameSessionDao()
-    private val specialtyGameDao = db.specialtyGameDao() // Nueva referencia al SpecialtyGameDao
+    private val specialtyGameDao = db.specialtyGameDao()
 
     suspend fun saveSession(session: GameSession) {
         dao.insert(session)
@@ -25,16 +25,14 @@ class ProgressRepository(private val db: AppDatabase) {
         return dao.getSessionsByChild(childUserId)
     }
 
-    fun getSessionsForChildByType(childUserId: Long, gameType: String): Flow<List<GameSession>> {
+    fun getSessionsByChildAndType(childUserId: Long, gameType: String): Flow<List<GameSession>> {
         return dao.getSessionsByChildAndType(childUserId, gameType)
     }
 
-    // Nuevo: Obtener sesiones por rango de fechas
     fun getSessionsByDateRange(childUserId: Long, startTime: Long, endTime: Long): Flow<List<GameSession>> {
         return dao.getSessionsByChildAndDateRange(childUserId, startTime, endTime)
     }
 
-    // Nuevo: Obtener resumen de progreso
     fun getProgressSummary(childUserId: Long): Flow<ProgressSummary> {
         return getSessionsForChild(childUserId).map { sessions ->
             ProgressSummary(
@@ -46,7 +44,6 @@ class ProgressRepository(private val db: AppDatabase) {
         }
     }
 
-    // Nuevo: Resumen por rango de fechas
     fun getProgressSummaryByDateRange(childUserId: Long, startTime: Long, endTime: Long): Flow<ProgressSummary> {
         return getSessionsByDateRange(childUserId, startTime, endTime).map { sessions ->
             ProgressSummary(
@@ -58,7 +55,6 @@ class ProgressRepository(private val db: AppDatabase) {
         }
     }
 
-    // Nuevo: Obtener juegos para una especialidad
     fun getGamesForSpecialty(specialtyId: Long): Flow<List<Game>> {
         return specialtyGameDao.getGamesForSpecialty(specialtyId)
     }

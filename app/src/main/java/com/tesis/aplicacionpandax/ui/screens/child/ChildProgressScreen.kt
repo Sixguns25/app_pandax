@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tesis.aplicacionpandax.data.entity.Child
+import com.tesis.aplicacionpandax.data.entity.Game
 import com.tesis.aplicacionpandax.data.entity.GameSession
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import kotlinx.coroutines.flow.collectLatest
@@ -23,29 +24,48 @@ import java.util.*
 @Composable
 fun ChildProgressScreen(
     child: Child?,
+    specialtyId: Long?,
     progressRepo: ProgressRepository
 ) {
     var sessions by remember { mutableStateOf<List<GameSession>>(emptyList()) }
+    var availableGames by remember { mutableStateOf<List<Game>>(emptyList()) }
     var averageStars by remember { mutableStateOf(0.0f) }
     var selectedGameType by remember { mutableStateOf("Todos") }
-    val gameTypes = listOf("Todos", "MEMORY", "EMOTIONS") // Incluye ambos juegos
 
-    // Cargar sesiones en tiempo real
-    LaunchedEffect(child?.userId, selectedGameType) {
+    // Obtener juegos disponibles para la especialidad
+    LaunchedEffect(specialtyId) {
+        specialtyId?.let { id ->
+            progressRepo.getGamesForSpecialty(id).collectLatest { games ->
+                availableGames = games
+                if (games.isNotEmpty()) {
+                    val gameTypes = listOf("Todos") + games.map { it.name }
+                    if (selectedGameType == "Todos" || !gameTypes.contains(selectedGameType)) {
+                        selectedGameType = "Todos"
+                    }
+                }
+            }
+        }
+    }
+
+    // Cargar sesiones filtradas por juegos disponibles
+    LaunchedEffect(child?.userId, selectedGameType, availableGames) {
         child?.userId?.let { childId ->
+            val availableGameTypes = availableGames.map { it.name }
             val flow = if (selectedGameType == "Todos") {
                 progressRepo.getSessionsForChild(childId)
+            } else if (availableGameTypes.contains(selectedGameType)) {
+                progressRepo.getSessionsByChildAndType(childId, selectedGameType)
             } else {
-                progressRepo.getSessionsForChildByType(childId, selectedGameType)
+                kotlinx.coroutines.flow.flowOf(emptyList<GameSession>())
             }
             flow.collectLatest { sessionList ->
-                sessions = sessionList
+                sessions = sessionList.filter { availableGameTypes.contains(it.gameType) }
                 averageStars = if (sessionList.isNotEmpty()) {
                     sessionList.map { it.score }.average().toFloat()
                 } else {
                     0.0f
                 }
-                Log.d("ChildProgressScreen", "Sesiones cargadas: ${sessions.size}, promedio=$averageStars")
+                Log.d("ChildProgressScreen", "Sesiones cargadas: ${sessions.size}, promedio=$averageStars, juegos disponibles: $availableGameTypes")
             }
         } ?: Log.e("ChildProgressScreen", "child o userId es nulo")
     }
@@ -56,9 +76,9 @@ fun ChildProgressScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (child == null) {
+        if (child == null || specialtyId == null) {
             Text(
-                text = "😕 No se encontró información del niño.",
+                text = "😕 No se encontró información del niño o especialista.",
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center
             )
@@ -105,6 +125,7 @@ fun ChildProgressScreen(
                     expanded = expanded,
                     onDismissRequest = { expanded = false }
                 ) {
+                    val gameTypes = listOf("Todos") + availableGames.map { it.name }
                     gameTypes.forEach { type ->
                         DropdownMenuItem(
                             text = { Text(type) },
