@@ -61,7 +61,7 @@ fun ChildProgressScreen(
             flow.collectLatest { sessionList ->
                 sessions = sessionList.filter { availableGameTypes.contains(it.gameType) }
                 averageStars = if (sessionList.isNotEmpty()) {
-                    sessionList.map { it.score }.average().toFloat()
+                    sessionList.map { it.stars }.average().toFloat()
                 } else {
                     0.0f
                 }
@@ -219,7 +219,7 @@ fun SessionItem(session: GameSession) {
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "⭐ Estrellas: ${session.score} ${"⭐".repeat(session.score)}",
+                text = "⭐ Estrellas: ${session.stars} ${"⭐".repeat(session.stars)}",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(

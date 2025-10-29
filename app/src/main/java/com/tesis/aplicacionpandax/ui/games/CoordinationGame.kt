@@ -86,7 +86,7 @@ fun CoordinationGame(
                     GameSession(
                         childUserId = childUserId,
                         gameType = "COORDINATION",
-                        score = stars,
+                        stars = stars,
                         timeTaken = timeTaken,
                         attempts = attempts,
                         timestamp = System.currentTimeMillis()

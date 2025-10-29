@@ -17,7 +17,7 @@ import androidx.room.ForeignKey
             entity = Specialty::class,
             parentColumns = ["id"],
             childColumns = ["specialtyId"],
-            onDelete = ForeignKey.CASCADE //para evitar borrar especialidades si hay especialistas asignados
+            onDelete = ForeignKey.RESTRICT //para evitar borrar especialidades si hay especialistas asignados
         ),
 
     ]

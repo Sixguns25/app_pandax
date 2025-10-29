@@ -7,159 +7,165 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Specialty
+import com.tesis.aplicacionpandax.ui.viewmodel.SpecialtiesUiState // Importa el estado
+import com.tesis.aplicacionpandax.ui.viewmodel.SpecialtiesViewModel // Importa el ViewModel
+import com.tesis.aplicacionpandax.ui.viewmodel.SpecialtiesViewModelFactory // Importa la Factory
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpecialtiesManagementScreen(
-    db: AppDatabase,
+    db: AppDatabase, // Mantenemos db para la Factory
     onBack: () -> Unit
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val specialties by db.specialtyDao().getAll().collectAsState(initial = emptyList())
-    var newSpecialtyName by remember { mutableStateOf("") }
-    var editingSpecialty by remember { mutableStateOf<Specialty?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
+    // Obtén los DAOs necesarios para la Factory
+    val specialtyDao = db.specialtyDao()
+    val specialistDao = db.specialistDao()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text("Gestionar Especialidades", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
+    // Crea e instancia el ViewModel usando la Factory
+    val viewModel: SpecialtiesViewModel = viewModel(
+        factory = SpecialtiesViewModelFactory(specialtyDao, specialistDao)
+    )
 
-        // Formulario para agregar/editar especialidad
-        OutlinedTextField(
-            value = editingSpecialty?.name ?: newSpecialtyName,
-            onValueChange = {
-                if (editingSpecialty != null) {
-                    editingSpecialty = editingSpecialty?.copy(name = it)
-                } else {
-                    newSpecialtyName = it
-                }
-            },
-            label = { Text(if (editingSpecialty != null) "Editar Especialidad" else "Nueva Especialidad") },
-            modifier = Modifier.fillMaxWidth()
-        )
+    // Observa el estado de la UI desde el ViewModel
+    val uiState by viewModel.uiState.collectAsState()
 
-        Spacer(modifier = Modifier.height(8.dp))
+    // Para mostrar mensajes en Snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope() // Para lanzar el Snackbar
 
-        Button(
-            onClick = {
-                coroutineScope.launch {
-                    if (editingSpecialty != null) {
-                        // Editar especialidad
-                        val updatedSpecialty = editingSpecialty!!.copy(name = editingSpecialty!!.name.trim())
-                        if (updatedSpecialty.name.isNotBlank()) {
-                            db.specialtyDao().update(updatedSpecialty)
-                            message = "Especialidad actualizada correctamente ✅"
-                            editingSpecialty = null
-                        } else {
-                            message = "Error: El nombre no puede estar vacío"
-                        }
-                    } else {
-                        // Agregar nueva especialidad
-                        val specialtyName = newSpecialtyName.trim()
-                        if (specialtyName.isNotBlank()) {
-                            db.specialtyDao().insert(Specialty(name = specialtyName))
-                            message = "Especialidad agregada correctamente ✅"
-                            newSpecialtyName = ""
-                        } else {
-                            message = "Error: El nombre no puede estar vacío"
-                        }
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (editingSpecialty != null) "Guardar Cambios" else "Agregar Especialidad")
+    // Muestra el Snackbar cuando hay un mensaje en el estado
+    LaunchedEffect(uiState.message) {
+        uiState.message?.let { message ->
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
+                viewModel.clearMessage() // Notifica al ViewModel que el mensaje se mostró
+            }
         }
+    }
 
-        if (editingSpecialty != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    editingSpecialty = null
-                    newSpecialtyName = ""
-                    message = null
-                },
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        modifier = Modifier.fillMaxSize()
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top
+        ) {
+            Text("Gestionar Especialidades", style = MaterialTheme.typography.headlineMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Formulario para agregar/editar especialidad
+            OutlinedTextField(
+                value = uiState.currentInputName, // Vinculado al estado del ViewModel
+                onValueChange = { viewModel.updateInputName(it) }, // Llama a la acción del ViewModel
+                label = { Text(if (uiState.editingSpecialty != null) "Editar Especialidad" else "Nueva Especialidad") },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) {
-                Text("Cancelar Edición")
-            }
-        }
+                readOnly = uiState.isLoading // No editable mientras carga
+            )
 
-        message?.let {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.primary)
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Lista de especialidades
-        Text("Especialidades Existentes", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        LazyColumn {
-            items(specialties) { specialty ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(specialty.name)
-                        Row {
-                            Button(
-                                onClick = { editingSpecialty = specialty },
-                                modifier = Modifier.padding(end = 8.dp)
-                            ) {
-                                Text("Editar")
-                            }
-                            Button(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        // Verificar si la especialidad está asignada
-                                        val assignedSpecialists = db.specialistDao()
-                                            .getSpecialistsBySpecialtyId(specialty.id)
-                                        if (assignedSpecialists.isEmpty()) {
-                                            db.specialtyDao().delete(specialty)
-                                            message = "Especialidad eliminada correctamente ✅"
-                                        } else {
-                                            message = "Error: No se puede eliminar, hay especialistas asignados"
-                                        }
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Eliminar")
-                            }
-                        }
-                    }
+            // Botón Guardar / Agregar
+            Button(
+                onClick = { viewModel.saveSpecialty() }, // Llama a la acción del ViewModel
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !uiState.isLoading // Deshabilitado mientras carga
+            ) {
+                if (uiState.isLoading && uiState.editingSpecialty == null) { // Indicador solo si está agregando
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(if (uiState.editingSpecialty != null) "Guardar Cambios" else "Agregar Especialidad")
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            // Botón Cancelar Edición (visible solo si estamos editando)
+            if (uiState.editingSpecialty != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { viewModel.cancelEditing() }, // Llama a la acción del ViewModel
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                    enabled = !uiState.isLoading
+                ) {
+                    Text("Cancelar Edición")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Lista de especialidades
+            Text("Especialidades Existentes", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(uiState.specialties, key = { it.id }) { specialty ->
+                    SpecialtyItem(
+                        specialty = specialty,
+                        onEditClick = { viewModel.startEditing(specialty) }, // Llama a la acción
+                        onDeleteClick = { viewModel.deleteSpecialty(specialty) }, // Llama a la acción
+                        isLoading = uiState.isLoading // Pasa el estado de carga
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f)) // Empuja el botón Volver hacia abajo
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                enabled = !uiState.isLoading
+            ) {
+                Text("Volver")
+            }
+        } // Fin Column principal
+    } // Fin Scaffold
+}
+
+// Composable auxiliar para mostrar cada item de especialidad
+@Composable
+private fun SpecialtyItem(
+    specialty: Specialty,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    isLoading: Boolean // Recibe el estado de carga general
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp), // Ajusta padding vertical
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Volver")
+            Text(specialty.name, modifier = Modifier.weight(1f).padding(end = 8.dp)) // Permite que el texto ocupe espacio
+            Row {
+                Button(
+                    onClick = onEditClick,
+                    modifier = Modifier.padding(end = 8.dp),
+                    enabled = !isLoading // Deshabilita si está cargando
+                ) {
+                    Text("Editar")
+                }
+                Button(
+                    onClick = onDeleteClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    enabled = !isLoading // Deshabilita si está cargando
+                ) {
+                    Text("Eliminar")
+                }
+            }
         }
     }
 }

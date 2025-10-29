@@ -201,7 +201,7 @@ fun PronunciationGame(
                 GameSession(
                     childUserId = childUserId,
                     gameType = "PRONUNCIATION",
-                    score = stars,
+                    stars = stars,
                     timeTaken = timeTaken,
                     attempts = attempts,
                     timestamp = System.currentTimeMillis()

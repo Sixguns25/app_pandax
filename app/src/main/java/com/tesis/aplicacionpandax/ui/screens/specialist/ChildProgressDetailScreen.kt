@@ -90,7 +90,7 @@ fun ChildProgressDetailScreen(
             }
             summary = ProgressSummary(
                 sessionCount = sessions.size,
-                averageScore = if (sessions.isNotEmpty()) sessions.map { it.score }.average().toFloat() else 0f,
+                averageStars = if (sessions.isNotEmpty()) sessions.map { it.stars }.average().toFloat() else 0f,
                 averageTimeTaken = if (sessions.isNotEmpty()) sessions.map { it.timeTaken / 1000f }.average().toFloat() else 0f,
                 averageAttempts = if (sessions.isNotEmpty()) sessions.map { it.attempts.toFloat() }.average().toFloat() else 0f
             )
@@ -225,7 +225,7 @@ fun ChildProgressDetailScreen(
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                text = "Promedio de estrellas: %.2f ⭐".format(it.averageScore),
+                                text = "Promedio de estrellas: %.2f ⭐".format(it.averageStars),
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
@@ -239,8 +239,8 @@ fun ChildProgressDetailScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = when {
-                                    it.averageScore >= 2.5 -> "¡Progreso excepcional! El niño muestra gran desempeño."
-                                    it.averageScore >= 1.5 -> "Buen progreso, con oportunidad de mejora en consistencia."
+                                    it.averageStars >= 2.5 -> "¡Progreso excepcional! El niño muestra gran desempeño."
+                                    it.averageStars >= 1.5 -> "Buen progreso, con oportunidad de mejora en consistencia."
                                     it.sessionCount > 0 -> "Progreso inicial, se recomienda más práctica."
                                     else -> "Aún no hay sesiones registradas."
                                 },
@@ -317,7 +317,7 @@ fun ChildProgressDetailScreen(
                             val path = Path()
                             sessions.forEachIndexed { index, session ->
                                 val x = padding + index * (graphWidth / (sessions.size - 1).coerceAtLeast(1))
-                                val y = (height - padding) - (session.score / maxScore) * graphHeight
+                                val y = (height - padding) - (session.stars / maxScore) * graphHeight
                                 if (index == 0) {
                                     path.moveTo(x, y)
                                 } else {
@@ -420,7 +420,7 @@ fun SessionItem(session: GameSession) {
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "⭐ Estrellas: ${session.score} ${"⭐".repeat(session.score)}",
+                text = "⭐ Estrellas: ${session.stars} ${"⭐".repeat(session.stars)}",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(

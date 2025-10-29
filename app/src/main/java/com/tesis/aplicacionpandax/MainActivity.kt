@@ -31,6 +31,7 @@ import com.tesis.aplicacionpandax.ui.screens.specialist.ChildProgressDetailScree
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.tesis.aplicacionpandax.util.ThemePreferences
 
 class MainActivity : ComponentActivity() {
 

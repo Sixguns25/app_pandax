@@ -108,7 +108,7 @@ fun ChildHomeScreen(
                                 GameSession(
                                     childUserId = childUserId,
                                     gameType = "MEMORY",
-                                    score = score,
+                                    stars = score,
                                     timeTaken = timeTaken,
                                     attempts = attempts,
                                     timestamp = System.currentTimeMillis()
@@ -141,7 +141,7 @@ fun ChildHomeScreen(
                                 GameSession(
                                     childUserId = childUserId,
                                     gameType = "COORDINATION",
-                                    score = score,
+                                    stars = score,
                                     timeTaken = timeTaken,
                                     attempts = attempts,
                                     timestamp = System.currentTimeMillis()
@@ -164,7 +164,7 @@ fun ChildHomeScreen(
                                 GameSession(
                                     childUserId = childUserId,
                                     gameType = "PRONUNCIATION",
-                                    score = score,
+                                    stars = score,
                                     timeTaken = timeTaken,
                                     attempts = attempts,
                                     timestamp = System.currentTimeMillis()

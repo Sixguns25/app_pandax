@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.map
 
 data class ProgressSummary(
     val sessionCount: Int,
-    val averageScore: Float,
+    val averageStars: Float,
     val averageTimeTaken: Float,
     val averageAttempts: Float
 )
@@ -37,7 +37,7 @@ class ProgressRepository(private val db: AppDatabase) {
         return getSessionsForChild(childUserId).map { sessions ->
             ProgressSummary(
                 sessionCount = sessions.size,
-                averageScore = if (sessions.isNotEmpty()) sessions.map { it.score }.average().toFloat() else 0f,
+                averageStars = if (sessions.isNotEmpty()) sessions.map { it.stars }.average().toFloat() else 0f,
                 averageTimeTaken = if (sessions.isNotEmpty()) sessions.map { it.timeTaken / 1000f }.average().toFloat() else 0f,
                 averageAttempts = if (sessions.isNotEmpty()) sessions.map { it.attempts.toFloat() }.average().toFloat() else 0f
             )
@@ -48,7 +48,7 @@ class ProgressRepository(private val db: AppDatabase) {
         return getSessionsByDateRange(childUserId, startTime, endTime).map { sessions ->
             ProgressSummary(
                 sessionCount = sessions.size,
-                averageScore = if (sessions.isNotEmpty()) sessions.map { it.score }.average().toFloat() else 0f,
+                averageStars = if (sessions.isNotEmpty()) sessions.map { it.stars }.average().toFloat() else 0f,
                 averageTimeTaken = if (sessions.isNotEmpty()) sessions.map { it.timeTaken / 1000f }.average().toFloat() else 0f,
                 averageAttempts = if (sessions.isNotEmpty()) sessions.map { it.attempts.toFloat() }.average().toFloat() else 0f
             )

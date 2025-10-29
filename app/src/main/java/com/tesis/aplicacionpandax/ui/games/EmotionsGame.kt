@@ -229,7 +229,7 @@ fun EmotionsGame(
                             GameSession(
                                 childUserId = childUserId,
                                 gameType = "EMOTIONS",
-                                score = stars,
+                                stars = stars,
                                 timeTaken = timeTaken,
                                 attempts = attempts,
                                 timestamp = System.currentTimeMillis()

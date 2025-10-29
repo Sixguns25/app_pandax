@@ -190,4 +190,57 @@ class AuthRepository(private val db: AppDatabase) {
         userDao.delete(user)
         return Result.success(Unit)
     }
+
+    // Nueva función para actualizar solo contacto
+    suspend fun updateSpecialistContact(userId: Long, phone: String, email: String): Result<Unit> {
+        val specialist = specialistDao.getByUserId(userId)
+            ?: return Result.failure(Exception("Especialista no encontrado"))
+
+        // Añade validaciones básicas si quieres (ej. formato de email)
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            return Result.failure(Exception("Formato de correo inválido"))
+        }
+        if (!phone.matches(Regex("\\d{9,15}"))) { // Misma validación que en RegisterChild
+            return Result.failure(Exception("Teléfono debe tener entre 9 y 15 dígitos"))
+        }
+
+        val updatedSpecialist = specialist.copy(
+            phone = phone.trim(),
+            email = email.trim()
+        )
+        return try {
+            specialistDao.update(updatedSpecialist)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception("Error al actualizar: ${e.message}"))
+        }
+    }
+
+    // Nueva función para cambiar contraseña
+    suspend fun changePassword(userId: Long, currentPassword: String, newPassword: String): Result<Unit> {
+        val user = userDao.getById(userId)
+            ?: return Result.failure(Exception("Usuario no encontrado"))
+
+        // Verificar contraseña actual
+        val isCurrentPasswordValid = PasswordUtils.verify(currentPassword, user.salt, user.passwordHash)
+        if (!isCurrentPasswordValid) {
+            return Result.failure(Exception("La contraseña actual es incorrecta"))
+        }
+
+        // Validar nueva contraseña (ej. longitud mínima)
+        if (newPassword.length < 6) {
+            return Result.failure(Exception("La nueva contraseña debe tener al menos 6 caracteres"))
+        }
+
+        // Hashear y actualizar
+        val (newSalt, newHash) = PasswordUtils.hashPasswordWithSalt(newPassword)
+        val updatedUser = user.copy(passwordHash = newHash, salt = newSalt)
+
+        return try {
+            userDao.update(updatedUser)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(Exception("Error al actualizar la contraseña: ${e.message}"))
+        }
+    }
 }

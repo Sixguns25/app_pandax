@@ -82,7 +82,11 @@ fun SpecialistHomeScreen(
                 SpecialistProfileScreen(specialistId)
             }
             composable("settings") {
-                SpecialistSettingsScreen(onLogout)
+                SpecialistSettingsScreen(
+                    specialistId = specialistId, // Pasa el ID del especialista
+                    authRepo = authRepository,   // Pasa la instancia del repositorio
+                    onLogout = onLogout          // Pasa la función de logout
+                )
             }
             composable("child_progress/{childId}") { backStackEntry ->
                 val childId = backStackEntry.arguments?.getString("childId")?.toLong() ?: -1
