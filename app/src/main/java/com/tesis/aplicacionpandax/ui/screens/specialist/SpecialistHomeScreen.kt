@@ -1,20 +1,21 @@
 package com.tesis.aplicacionpandax.ui.screens.specialist
 
+import androidx.compose.foundation.layout.Column // Importaciones necesarias
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController // <-- IMPORTACIÓN AÑADIDA
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,13 +24,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Child
+import com.tesis.aplicacionpandax.data.entity.Specialist // <-- IMPORTACIÓN AÑADIDA
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
 import com.tesis.aplicacionpandax.ui.screens.admin.ChildDetailScreen
 import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.Flow // <-- IMPORTACIÓN AÑADIDA
+import kotlinx.coroutines.launch // <-- IMPORTACIÓN AÑADIDA
 
 @Composable
 fun SpecialistHomeScreen(
@@ -37,10 +40,10 @@ fun SpecialistHomeScreen(
     childrenFlow: Flow<List<Child>>,
     progressRepo: ProgressRepository,
     db: AppDatabase,
+    authRepo: AuthRepository, // <-- PARÁMETRO AÑADIDO A LA DEFINICIÓN
     onLogout: () -> Unit
 ) {
-    val navController = rememberNavController()
-    val authRepository = AuthRepository(db) // Instancia única
+    val navController = rememberNavController() // NavController interno para las pestañas
 
     val items = listOf(
         BottomNavItem("children", "Hijos", Icons.Default.List),
@@ -56,7 +59,15 @@ fun SpecialistHomeScreen(
                 items.forEach { item ->
                     NavigationBarItem(
                         selected = currentRoute == item.route,
-                        onClick = { navController.navigate(item.route) },
+                        onClick = {
+                            if (currentRoute != item.route) {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },
                         icon = { Icon(item.icon, contentDescription = item.label) },
                         label = { Text(item.label) }
                     )
@@ -64,6 +75,7 @@ fun SpecialistHomeScreen(
             }
         }
     ) { padding ->
+        // NavHost interno para manejar las pestañas Hijos, Perfil, Ajustes
         NavHost(
             navController = navController,
             startDestination = "children",
@@ -72,51 +84,75 @@ fun SpecialistHomeScreen(
             composable("children") {
                 SpecialistChildrenScreen(
                     db = db,
-                    repo = authRepository,
+                    repo = authRepo, // Pasa el repo
                     navController = navController,
                     specialistId = specialistId,
                     childrenFlow = childrenFlow
                 )
             }
+            // CORREGIDO
             composable("profile") {
                 SpecialistProfileScreen(
                     specialistId = specialistId,
-                    db = db // <-- AÑADE ESTE PARÁMETRO
+                    db = db // <-- db añadido
                 )
             }
             composable("settings") {
                 SpecialistSettingsScreen(
-                    specialistId = specialistId, // Pasa el ID del especialista
-                    authRepo = authRepository,   // Pasa la instancia del repositorio
-                    onLogout = onLogout          // Pasa la función de logout
+                    specialistId = specialistId,
+                    authRepo = authRepo, // Correcto
+                    onLogout = onLogout // Correcto
                 )
             }
-            composable("child_progress/{childId}") { backStackEntry ->
-                val childId = backStackEntry.arguments?.getString("childId")?.toLong() ?: -1
+
+            // --- Definiciones de rutas alcanzables DESDE las pantallas de este NavHost ---
+            // CORREGIDO
+            composable(
+                route = "child_progress/{childId}",
+                arguments = listOf(navArgument("childId") { type = NavType.LongType })
+            ){ backStackEntry ->
+                val childId = backStackEntry.arguments?.getLong("childId") ?: -1
+                var childSpecialtyId by remember { mutableStateOf<Long?>(null) }
+                LaunchedEffect(childId) {
+                    val child = db.childDao().getByUserId(childId)
+                    child?.specialistId?.let { specId ->
+                        val spec = db.specialistDao().getByUserId(specId)
+                        childSpecialtyId = spec?.specialtyId
+                    }
+                }
                 ChildProgressDetailScreen(
                     childUserId = childId,
-                    progressRepo = progressRepo
+                    progressRepo = progressRepo,
+                    db = db, // <-- db añadido
+                    navController = navController, // <-- navController añadido
+                    specialtyId = childSpecialtyId // <-- specialtyId añadido
                 )
             }
+            // CORREGIDO
             composable(NavRoutes.SpecialistRegisterChild.route) {
+                val specialists by db.specialistDao().getAll().collectAsState(initial = emptyList())
                 RegisterChildScreen(
-                    repo = authRepository,
-                    specialists = emptyList(),
+                    repo = authRepo,
+                    specialists = specialists, // <-- specialists añadido
                     onBack = { navController.popBackStack() },
-                    specialistId = specialistId
+                    specialistId = specialistId,
+                    db = db // <-- db añadido
                 )
             }
+            // CORREGIDO
             composable(
                 route = "${NavRoutes.SpecialistRegisterChild.route}/{childId}",
                 arguments = listOf(navArgument("childId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
+                val specialists by db.specialistDao().getAll().collectAsState(initial = emptyList())
                 RegisterChildScreen(
-                    repo = authRepository,
-                    specialists = emptyList(),
+                    repo = authRepo,
+                    specialists = specialists, // <-- specialists añadido
                     onBack = { navController.popBackStack() },
                     specialistId = specialistId,
-                    childId = childId
+                    childId = childId,
+                    db = db // <-- db añadido
                 )
             }
             composable(
@@ -130,6 +166,6 @@ fun SpecialistHomeScreen(
                     childId = childId
                 )
             }
-        }
-    }
+        } // Fin NavHost interno
+    } // Fin Scaffold
 }

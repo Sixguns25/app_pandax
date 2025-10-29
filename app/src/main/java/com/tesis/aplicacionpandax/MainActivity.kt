@@ -1,33 +1,43 @@
 package com.tesis.aplicacionpandax
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController // Importar NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tesis.aplicacionpandax.data.AppDatabase
+import com.tesis.aplicacionpandax.data.entity.Specialist
+import com.tesis.aplicacionpandax.data.entity.GameSession // Importar GameSession
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
-import com.tesis.aplicacionpandax.ui.viewmodel.AuthViewModel
 import com.tesis.aplicacionpandax.ui.navigation.NavRoutes
-import com.tesis.aplicacionpandax.ui.screens.admin.AdminChildrenScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.AdminHomeScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.RegisterChildScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.RegisterSpecialistScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.SpecialtiesManagementScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.SpecialistsManagementScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.SpecialistDetailScreen
-import com.tesis.aplicacionpandax.ui.screens.admin.ChildDetailScreen
+import com.tesis.aplicacionpandax.ui.screens.admin.*
 import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.common.LoginScreen
-import com.tesis.aplicacionpandax.ui.screens.specialist.SpecialistHomeScreen
 import com.tesis.aplicacionpandax.ui.screens.specialist.ChildProgressDetailScreen
+import com.tesis.aplicacionpandax.ui.screens.specialist.SpecialistHomeScreen
+import com.tesis.aplicacionpandax.ui.theme.AplicacionPandaxTheme
+import com.tesis.aplicacionpandax.ui.viewmodel.AuthViewModel
+// Importar los juegos
+import com.tesis.aplicacionpandax.ui.games.CoordinationGame
+import com.tesis.aplicacionpandax.ui.games.MemoryGame
+import com.tesis.aplicacionpandax.ui.games.PronunciationGame
+import com.tesis.aplicacionpandax.ui.screens.game.EmotionsGame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -44,211 +54,303 @@ class MainActivity : ComponentActivity() {
         val progressRepo = ProgressRepository(db)
 
         setContent {
-            val viewModel: AuthViewModel = viewModel(
-                factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return AuthViewModel(authRepo) as T
-                    }
-                }
-            )
-
-            val navController = rememberNavController()
-            var loggedUserId by remember { mutableStateOf<Long?>(null) }
-            val coroutineScope = rememberCoroutineScope()
-
-            // Flujos de datos
-            val specialistsFlow = db.specialistDao().getAll()
-            val specialists by specialistsFlow.collectAsState(initial = emptyList())
-            val childrenFlow = db.childDao().getAllWithSpecialist()
-
-            NavHost(
-                navController = navController,
-                startDestination = NavRoutes.Login.route
-            ) {
-                // Login
-                composable(NavRoutes.Login.route) {
-                    LoginScreen(viewModel) { user ->
-                        loggedUserId = user.userId
-                        when (user.role) {
-                            "ADMIN" -> navController.navigate(NavRoutes.AdminHome.route)
-                            "SPECIALIST" -> navController.navigate(NavRoutes.SpecialistHome.route)
-                            "CHILD" -> navController.navigate(NavRoutes.ChildHome.route)
+            AplicacionPandaxTheme(darkTheme = isSystemInDarkTheme(), dynamicColor = true) {
+                val viewModel: AuthViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
+                            return AuthViewModel(authRepo) as T
                         }
                     }
-                }
+                )
 
-                // Admin
-                composable(NavRoutes.AdminHome.route) {
-                    AdminHomeScreen(
-                        onRegisterSpecialist = { navController.navigate(NavRoutes.RegisterSpecialist.route) },
-                        onRegisterChild = { navController.navigate(NavRoutes.RegisterChild.route) },
-                        onManageSpecialties = { navController.navigate(NavRoutes.ManageSpecialties.route) },
-                        onManageSpecialists = { navController.navigate(NavRoutes.ManageSpecialists.route) },
-                        onManageChildren = { navController.navigate(NavRoutes.ManageChildren.route) },
-                        onLogout = {
-                            loggedUserId = null
-                            navController.navigate(NavRoutes.Login.route) {
-                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                val navController = rememberNavController()
+                var loggedUserId by remember { mutableStateOf<Long?>(null) }
+                val coroutineScope = rememberCoroutineScope()
+
+                // Flujos de datos
+                val specialistsFlow = db.specialistDao().getAll()
+                val specialists by specialistsFlow.collectAsState(initial = emptyList())
+                val childrenFlow = db.childDao().getAllWithSpecialist()
+
+                NavHost(
+                    navController = navController,
+                    startDestination = NavRoutes.Login.route
+                ) {
+                    // --- Login ---
+                    composable(NavRoutes.Login.route) {
+                        LoginScreen(viewModel) { user ->
+                            loggedUserId = user.userId
+                            val destination = when (user.role) {
+                                "ADMIN" -> NavRoutes.AdminHome.route
+                                "SPECIALIST" -> NavRoutes.SpecialistHome.route
+                                "CHILD" -> NavRoutes.ChildHome.route
+                                else -> NavRoutes.Login.route
                             }
-                        }
-                    )
-                }
-                composable(NavRoutes.RegisterSpecialist.route) {
-                    RegisterSpecialistScreen(
-                        repo = authRepo,
-                        db = db,
-                        specialistId = -1L,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable(
-                    route = "${NavRoutes.RegisterSpecialist.route}/{specialistId}",
-                    arguments = listOf(navArgument("specialistId") { type = NavType.LongType; defaultValue = -1L })
-                ) { backStackEntry ->
-                    val specialistId = backStackEntry.arguments?.getLong("specialistId") ?: -1L
-                    RegisterSpecialistScreen(
-                        repo = authRepo,
-                        db = db,
-                        specialistId = specialistId,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable(NavRoutes.RegisterChild.route) {
-                    RegisterChildScreen(
-                        repo = authRepo,
-                        specialists = specialists,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable(
-                    route = "${NavRoutes.RegisterChild.route}/{childId}",
-                    arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
-                ) { backStackEntry ->
-                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
-                    RegisterChildScreen(
-                        repo = authRepo,
-                        specialists = specialists,
-                        onBack = { navController.popBackStack() },
-                        childId = childId
-                    )
-                }
-                composable(NavRoutes.ManageSpecialties.route) {
-                    SpecialtiesManagementScreen(
-                        db = db,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable(NavRoutes.ManageSpecialists.route) {
-                    SpecialistsManagementScreen(
-                        db = db,
-                        repo = authRepo,
-                        navController = navController
-                    )
-                }
-                composable(NavRoutes.ManageChildren.route) {
-                    AdminChildrenScreen(
-                        db = db,
-                        repo = authRepo,
-                        navController = navController,
-                        childrenFlow = childrenFlow
-                    )
-                }
-                composable(
-                    route = "specialist_detail/{specialistId}",
-                    arguments = listOf(navArgument("specialistId") { type = NavType.LongType })
-                ) { backStackEntry ->
-                    val specialistId = backStackEntry.arguments?.getLong("specialistId") ?: -1L
-                    SpecialistDetailScreen(
-                        navController = navController,
-                        db = db,
-                        specialistId = specialistId
-                    )
-                }
-                composable(
-                    route = "child_detail/{childId}",
-                    arguments = listOf(navArgument("childId") { type = NavType.LongType })
-                ) { backStackEntry ->
-                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
-                    ChildDetailScreen(
-                        navController = navController,
-                        db = db,
-                        childId = childId
-                    )
-                }
-                composable(
-                    route = "child_progress/{childId}",
-                    arguments = listOf(navArgument("childId") { type = NavType.LongType })
-                ) { backStackEntry ->
-                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
-                    ChildProgressDetailScreen(
-                        childUserId = childId,
-                        progressRepo = progressRepo
-                    )
-                }
-
-                // Specialist
-                composable(NavRoutes.SpecialistHome.route) {
-                    SpecialistHomeScreen(
-                        specialistId = loggedUserId ?: -1,
-                        childrenFlow = db.childDao().getChildrenForSpecialist(loggedUserId ?: -1),
-                        progressRepo = progressRepo,
-                        db = db,
-                        onLogout = {
-                            loggedUserId = null
-                            navController.navigate(NavRoutes.Login.route) {
-                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                            navController.navigate(destination) {
+                                popUpTo(NavRoutes.Login.route) { inclusive = true }
+                                launchSingleTop = true
                             }
-                        }
-                    )
-                }
-                composable(NavRoutes.SpecialistRegisterChild.route) {
-                    RegisterChildScreen(
-                        repo = authRepo,
-                        specialists = specialists,
-                        onBack = { navController.popBackStack() },
-                        specialistId = loggedUserId
-                    )
-                }
-                composable(
-                    route = "${NavRoutes.SpecialistRegisterChild.route}/{childId}",
-                    arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
-                ) { backStackEntry ->
-                    val childId = backStackEntry.arguments?.getLong("childId") ?: -1L
-                    RegisterChildScreen(
-                        repo = authRepo,
-                        specialists = specialists,
-                        onBack = { navController.popBackStack() },
-                        specialistId = loggedUserId,
-                        childId = childId
-                    )
-                }
-
-                // Child
-                composable(NavRoutes.ChildHome.route) {
-                    val childFlow = db.childDao().getChildByUserId(loggedUserId ?: -1)
-                    val child by childFlow.collectAsState(initial = null)
-                    var specialist by remember { mutableStateOf<com.tesis.aplicacionpandax.data.entity.Specialist?>(null) }
-
-                    LaunchedEffect(child?.specialistId) {
-                        child?.specialistId?.let { specialistId ->
-                            specialist = db.specialistDao().getByUserId(specialistId)
                         }
                     }
 
-                    ChildHomeScreen(
-                        child = child,
-                        specialist = specialist,
-                        progressRepo = progressRepo,
-                        db = db,
-                        onLogout = {
-                            loggedUserId = null
-                            navController.navigate(NavRoutes.Login.route) {
-                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    // --- Admin ---
+                    // (Rutas de Admin: AdminHome, RegisterSpecialist, RegisterChild, etc. sin cambios)
+                    composable(NavRoutes.AdminHome.route) {
+                        AdminHomeScreen(
+                            onRegisterSpecialist = { navController.navigate(NavRoutes.RegisterSpecialist.route) },
+                            onRegisterChild = { navController.navigate(NavRoutes.RegisterChild.route) },
+                            onManageSpecialties = { navController.navigate(NavRoutes.ManageSpecialties.route) },
+                            onManageSpecialists = { navController.navigate(NavRoutes.ManageSpecialists.route) },
+                            onManageChildren = { navController.navigate(NavRoutes.ManageChildren.route) },
+                            onLogout = {
+                                loggedUserId = null
+                                navController.navigate(NavRoutes.Login.route) {
+                                    popUpTo(NavRoutes.AdminHome.route) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                    composable(NavRoutes.RegisterSpecialist.route) {
+                        RegisterSpecialistScreen( repo = authRepo, db = db, specialistId = -1L, onBack = { navController.popBackStack() } )
+                    }
+                    composable(
+                        route = "${NavRoutes.RegisterSpecialist.route}/{specialistId}",
+                        arguments = listOf(navArgument("specialistId") { type = NavType.LongType; defaultValue = -1L })
+                    ) { backStackEntry ->
+                        val specialistIdArg = backStackEntry.arguments?.getLong("specialistId") ?: -1L
+                        RegisterSpecialistScreen( repo = authRepo, db = db, specialistId = specialistIdArg, onBack = { navController.popBackStack() } )
+                    }
+                    composable(NavRoutes.RegisterChild.route) {
+                        RegisterChildScreen( repo = authRepo, specialists = specialists, onBack = { navController.popBackStack() }, db = db )
+                    }
+                    composable(
+                        route = "${NavRoutes.RegisterChild.route}/{childId}",
+                        arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
+                    ) { backStackEntry ->
+                        val childIdArg = backStackEntry.arguments?.getLong("childId") ?: -1L
+                        RegisterChildScreen( repo = authRepo, specialists = specialists, onBack = { navController.popBackStack() }, childId = childIdArg, db = db )
+                    }
+                    composable(NavRoutes.ManageSpecialties.route) {
+                        SpecialtiesManagementScreen( db = db, onBack = { navController.popBackStack() } )
+                    }
+                    composable(NavRoutes.ManageSpecialists.route) {
+                        SpecialistsManagementScreen( db = db, repo = authRepo, navController = navController )
+                    }
+                    composable(NavRoutes.ManageChildren.route) {
+                        AdminChildrenScreen( db = db, repo = authRepo, navController = navController, childrenFlow = childrenFlow )
+                    }
+                    composable(
+                        route = "specialist_detail/{specialistId}",
+                        arguments = listOf(navArgument("specialistId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        val specialistIdArg = backStackEntry.arguments?.getLong("specialistId") ?: -1L
+                        SpecialistDetailScreen( navController = navController, db = db, specialistId = specialistIdArg )
+                    }
+
+
+                    // --- Specialist ---
+                    composable(NavRoutes.SpecialistHome.route) {
+                        SpecialistHomeScreen(
+                            specialistId = loggedUserId ?: -1,
+                            childrenFlow = db.childDao().getChildrenForSpecialist(loggedUserId ?: -1),
+                            progressRepo = progressRepo,
+                            db = db,
+                            authRepo = authRepo,
+                            onLogout = {
+                                loggedUserId = null
+                                navController.navigate(NavRoutes.Login.route) {
+                                    popUpTo(NavRoutes.SpecialistHome.route) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+                    composable(NavRoutes.SpecialistRegisterChild.route) {
+                        RegisterChildScreen(
+                            repo = authRepo,
+                            specialists = specialists,
+                            onBack = { navController.popBackStack() },
+                            specialistId = loggedUserId,
+                            db = db
+                        )
+                    }
+                    composable(
+                        route = "${NavRoutes.SpecialistRegisterChild.route}/{childId}",
+                        arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
+                    ) { backStackEntry ->
+                        val childIdArg = backStackEntry.arguments?.getLong("childId") ?: -1L
+                        RegisterChildScreen(
+                            repo = authRepo,
+                            specialists = specialists,
+                            onBack = { navController.popBackStack() },
+                            specialistId = loggedUserId,
+                            childId = childIdArg,
+                            db = db
+                        )
+                    }
+
+
+                    // --- Child ---
+                    composable(NavRoutes.ChildHome.route) {
+                        val childId = loggedUserId ?: -1L
+                        val childFlow = db.childDao().getChildByUserId(childId)
+                        val child by childFlow.collectAsState(initial = null)
+                        var specialist by remember { mutableStateOf<Specialist?>(null) }
+
+                        LaunchedEffect(child?.specialistId) {
+                            child?.specialistId?.let { specId ->
+                                specialist = db.specialistDao().getByUserId(specId)
+                            } ?: run { specialist = null }
+                        }
+
+                        ChildHomeScreen(
+                            child = child,
+                            specialist = specialist,
+                            progressRepo = progressRepo,
+                            db = db,
+                            navController = navController, // Pasa el NavController principal
+                            onLogout = {
+                                loggedUserId = null
+                                navController.navigate(NavRoutes.Login.route) {
+                                    popUpTo(NavRoutes.ChildHome.route) { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    // --- Rutas Comunes (Admin/Specialist) ---
+                    composable(
+                        route = "child_detail/{childId}",
+                        arguments = listOf(navArgument("childId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        val childIdArg = backStackEntry.arguments?.getLong("childId") ?: -1L
+                        ChildDetailScreen( navController = navController, db = db, childId = childIdArg )
+                    }
+                    composable(
+                        route = "child_progress/{childId}",
+                        arguments = listOf(navArgument("childId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        val childIdArg = backStackEntry.arguments?.getLong("childId") ?: -1L
+                        var childSpecialtyId by remember { mutableStateOf<Long?>(null) }
+                        LaunchedEffect(childIdArg) {
+                            val child = db.childDao().getByUserId(childIdArg)
+                            child?.specialistId?.let { specId ->
+                                val spec = db.specialistDao().getByUserId(specId)
+                                childSpecialtyId = spec?.specialtyId
                             }
                         }
-                    )
-                }
-            }
-        }
-    }
+                        ChildProgressDetailScreen(
+                            childUserId = childIdArg,
+                            progressRepo = progressRepo,
+                            db = db,
+                            navController = navController,
+                            specialtyId = childSpecialtyId
+                        )
+                    }
+
+
+                    // --- 👇👇👇 RUTAS DE JUEGOS AÑADIDAS AQUÍ 👇👇👇 ---
+                    // (Accesibles desde ChildHomeScreen -> GamesMenuScreen)
+
+                    composable(
+                        route = "memory_game/{childUserId}",
+                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        // 👇 Cambia el valor por defecto a -1L
+                        val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
+                        // Añade una verificación
+                        if (childId == -1L) {
+                            Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
+                        } else {
+                            MemoryGame(
+                                childUserId = childId,
+                                progressRepo = progressRepo,
+                                onGameEnd = { stars, timeTaken, attempts ->
+                                    coroutineScope.launch {
+                                        progressRepo.saveSession(GameSession(
+                                            childUserId = childId, gameType = "MEMORY", stars = stars, timeTaken = timeTaken, attempts = attempts
+                                        ))
+                                    }
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+                    }
+
+                    composable(
+                        route = "emotions_game/{childUserId}",
+                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        // 👇 Cambia el valor por defecto a -1L
+                        val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
+                        // Añade una verificación
+                        if (childId == -1L) {
+                            Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
+                        } else {
+                            EmotionsGame(
+                                childUserId = childId,
+                                onSessionComplete = { session ->
+                                    // Verifica aquí también por si acaso
+                                    if (session.childUserId != -1L) {
+                                        coroutineScope.launch {
+                                            progressRepo.saveSession(session)
+                                        }
+                                    } else {
+                                        Log.e("MainActivity", "Intento de guardar sesión con childUserId inválido (-1)")
+                                        // Opcionalmente mostrar Snackbar de error
+                                    }
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+                    }
+
+                    composable(
+                        route = "coordination_game/{childUserId}",
+                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        // 👇 Cambia el valor por defecto a -1L
+                        val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
+                        // Añade una verificación
+                        if (childId == -1L) {
+                            Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
+                        } else {
+                            CoordinationGame(
+                                childUserId = childId,
+                                progressRepo = progressRepo,
+                                onGameEnd = { stars, timeTaken, attempts ->
+                                    // CoordinationGame ya guarda internamente, solo volvemos
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+                    }
+
+                    composable(
+                        route = "pronunciation_game/{childUserId}",
+                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                    ) { backStackEntry ->
+                        // 👇 Cambia el valor por defecto a -1L
+                        val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
+                        // Añade una verificación
+                        if (childId == -1L) {
+                            Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
+                        } else {
+                            PronunciationGame(
+                                childUserId = childId,
+                                progressRepo = progressRepo,
+                                onGameEnd = { stars, timeTaken, attempts ->
+                                    // PronunciationGame ya guarda internamente, solo volvemos
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+                    }
+                    // --- 👆👆👆 FIN DE RUTAS DE JUEGOS AÑADIDAS 👆👆👆 ---
+
+
+                } // Fin NavHost
+            } // Fin AplicacionPandaxTheme
+        } // Fin setContent
+    } // Fin onCreate
 }

@@ -1,44 +1,22 @@
 package com.tesis.aplicacionpandax.ui.screens.child
 
-import android.util.Log
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Games
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.* // Importar iconos
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavController // <-- IMPORTACIÓN AÑADIDA
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.tesis.aplicacionpandax.data.AppDatabase
 import com.tesis.aplicacionpandax.data.entity.Child
-import com.tesis.aplicacionpandax.data.entity.GameSession
 import com.tesis.aplicacionpandax.data.entity.Specialist
 import com.tesis.aplicacionpandax.repository.ProgressRepository
-import com.tesis.aplicacionpandax.ui.games.CoordinationGame
-import com.tesis.aplicacionpandax.ui.games.MemoryGame
-import com.tesis.aplicacionpandax.ui.games.PronunciationGame
 import com.tesis.aplicacionpandax.ui.navigation.BottomNavItem
-import com.tesis.aplicacionpandax.ui.screens.child.ChildProgressScreen
-import com.tesis.aplicacionpandax.ui.screens.child.ChildProfileScreen
-import com.tesis.aplicacionpandax.ui.screens.child.ChildHomeSection
-import com.tesis.aplicacionpandax.ui.screens.child.GamesMenuScreen
-import com.tesis.aplicacionpandax.ui.screens.game.EmotionsGame
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.launch // Importar launch
 
 @Composable
 fun ChildHomeScreen(
@@ -46,10 +24,10 @@ fun ChildHomeScreen(
     specialist: Specialist?,
     progressRepo: ProgressRepository,
     db: AppDatabase,
+    navController: NavController, // <-- PARÁMETRO AÑADIDO (es el NavController principal de MainActivity)
     onLogout: () -> Unit
 ) {
-    val navController = rememberNavController()
-    val scope = rememberCoroutineScope()
+    val bottomNavController = rememberNavController() // NavController INTERNO para las pestañas
 
     val items = listOf(
         BottomNavItem("home", "Inicio", Icons.Default.Home),
@@ -58,21 +36,23 @@ fun ChildHomeScreen(
         BottomNavItem("profile", "Perfil", Icons.Default.Person)
     )
 
-    // Extrae specialtyId del especialista para pasarlo a GamesMenuScreen
-    var specialtyId by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(specialist) {
-        specialtyId = specialist?.specialtyId
-    }
-
     Scaffold(
         bottomBar = {
             NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
                 items.forEach { item ->
                     NavigationBarItem(
                         selected = currentRoute == item.route,
-                        onClick = { navController.navigate(item.route) },
+                        onClick = {
+                            if (currentRoute != item.route) {
+                                bottomNavController.navigate(item.route){
+                                    popUpTo(bottomNavController.graph.startDestinationId){ saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },
                         icon = { Icon(item.icon, contentDescription = item.label) },
                         label = { Text(item.label) }
                     )
@@ -81,7 +61,7 @@ fun ChildHomeScreen(
         }
     ) { padding ->
         NavHost(
-            navController = navController,
+            navController = bottomNavController, // Usa el NavController interno
             startDestination = "home",
             modifier = Modifier.padding(padding)
         ) {
@@ -90,106 +70,27 @@ fun ChildHomeScreen(
                     child = child,
                     specialist = specialist,
                     db = db,
-                    navController = navController
+                    navController = bottomNavController // Pasa el INTERNO para navegar a "games"
                 )
             }
             composable("games") {
                 GamesMenuScreen(
                     child = child,
-                    specialtyId = specialtyId,
-                    navController = navController,
+                    specialtyId = specialist?.specialtyId,
+                    navController = navController, // Pasa el NavController PRINCIPAL (de MainActivity)
                     progressRepo = progressRepo
                 )
             }
-            composable("memory_game/{childUserId}") { backStackEntry ->
-                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
-                MemoryGame(
-                    childUserId = childUserId,
-                    progressRepo = progressRepo,
-                    onGameEnd = { score, timeTaken, attempts ->
-                        Log.d("ChildHomeScreen", "Juego de Memoria terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
-                        scope.launch {
-                            progressRepo.saveSession(
-                                GameSession(
-                                    childUserId = childUserId,
-                                    gameType = "MEMORY",
-                                    stars = score,
-                                    timeTaken = timeTaken,
-                                    attempts = attempts,
-                                    timestamp = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                        navController.popBackStack()
-                    }
-                )
-            }
-            composable("emotions_game/{childUserId}") { backStackEntry ->
-                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
-                EmotionsGame(
-                    childUserId = childUserId,
-                    onSessionComplete = { session ->
-                        scope.launch { progressRepo.saveSession(session) }
-                        navController.popBackStack()
-                    }
-                )
-            }
-            composable("coordination_game/{childUserId}") { backStackEntry ->
-                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
-                CoordinationGame(
-                    childUserId = childUserId,
-                    progressRepo = progressRepo,
-                    onGameEnd = { score, timeTaken, attempts ->
-                        Log.d("ChildHomeScreen", "Juego de Coordinación terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
-                        scope.launch {
-                            progressRepo.saveSession(
-                                GameSession(
-                                    childUserId = childUserId,
-                                    gameType = "COORDINATION",
-                                    stars = score,
-                                    timeTaken = timeTaken,
-                                    attempts = attempts,
-                                    timestamp = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                        navController.popBackStack()
-                    }
-                )
-            }
-            composable("pronunciation_game/{childUserId}") { backStackEntry ->
-                val childUserId = backStackEntry.arguments?.getString("childUserId")?.toLong() ?: 0L
-                PronunciationGame(
-                    childUserId = childUserId,
-                    progressRepo = progressRepo,
-                    onGameEnd = { score, timeTaken, attempts ->
-                        Log.d("ChildHomeScreen", "Juego de Pronunciación terminado: score=$score, timeTaken=$timeTaken, attempts=$attempts")
-                        scope.launch {
-                            progressRepo.saveSession(
-                                GameSession(
-                                    childUserId = childUserId,
-                                    gameType = "PRONUNCIATION",
-                                    stars = score,
-                                    timeTaken = timeTaken,
-                                    attempts = attempts,
-                                    timestamp = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                        navController.popBackStack()
-                    }
-                )
-            }
             composable("progress") {
-                ChildProgressScreen(
+                ChildProgressScreen( // Esta pantalla no navega, así que no necesita NavController
                     child = child,
-                    specialtyId = specialtyId,  // Añadido para filtrar progreso por juegos disponibles
+                    specialtyId = specialist?.specialtyId,
                     progressRepo = progressRepo
                 )
             }
             composable("profile") {
-                ChildProfileScreen(child, onLogout)
+                ChildProfileScreen(child = child, onLogout = onLogout)
             }
-        }
-    }
+        } // Fin NavHost interno
+    } // Fin Scaffold
 }

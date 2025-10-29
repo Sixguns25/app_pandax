@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.preference.ktx)
+    implementation(libs.androidx.navigation.runtime.android)
     kapt(libs.room.compiler)
 
     // ---- Coroutines ----

@@ -3,13 +3,24 @@ package com.tesis.aplicacionpandax.ui.screens.admin
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.tesis.aplicacionpandax.data.AppDatabase
+import com.tesis.aplicacionpandax.data.AppDatabase // <-- IMPORTACIÓN AÑADIDA
 import com.tesis.aplicacionpandax.data.entity.Specialist
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import kotlinx.coroutines.flow.collectLatest
@@ -23,39 +34,45 @@ fun RegisterChildScreen(
     repo: AuthRepository,
     specialists: List<Specialist>,
     onBack: () -> Unit,
+    db: AppDatabase, // <-- 👇 PARÁMETRO AÑADIDO
     specialistId: Long? = null,
-    childId: Long? = null  // Agregado para modo edición
+    childId: Long? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
 
-    // Estados
+    // --- Estados del formulario ---
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var dni by remember { mutableStateOf("") }
     var condition by remember { mutableStateOf("") }
-    var sex by remember { mutableStateOf("") } // "M" o "F"
-    var sexDisplay by remember { mutableStateOf("") } // "Masculino" o "Femenino"
+    var sex by remember { mutableStateOf("") }
+    var sexDisplay by remember { mutableStateOf("") }
     var birthDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var guardianName by remember { mutableStateOf("") }
     var guardianPhone by remember { mutableStateOf("") }
     var selectedSpecialistId by remember { mutableStateOf<Long?>(specialistId) }
-    var message by remember { mutableStateOf<String?>(null) }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    // --- Estados de UI ---
     var showDatePicker by remember { mutableStateOf(false) }
     var expandedSpecialist by remember { mutableStateOf(false) }
     var expandedSex by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isDataLoading by remember { mutableStateOf(childId != null && childId != -1L) }
 
-    // Opciones para el desplegable de sexo
     val sexOptions = listOf("Masculino" to "M", "Femenino" to "F")
 
-    // Cargar datos si es modo edición
+    // --- Cargar datos si es modo edición ---
     LaunchedEffect(childId) {
-        if (childId != null) {
-            val db = AppDatabase.getInstance(context, scope)
+        if (childId != null && childId != -1L) {
+            isDataLoading = true
+            // Usa la instancia 'db' pasada como parámetro
             val child = db.childDao().getByUserId(childId)
             val user = db.userDao().getById(childId)
             if (child != null && user != null) {
@@ -65,32 +82,37 @@ fun RegisterChildScreen(
                 dni = child.dni
                 condition = child.condition
                 sex = child.sex
-                sexDisplay = if (child.sex == "M") "Masculino" else if (child.sex == "F") "Femenino" else ""
+                sexDisplay = sexOptions.find { it.second == child.sex }?.first ?: ""
                 birthDateMillis = child.birthDateMillis
                 guardianName = child.guardianName
                 guardianPhone = child.guardianPhone
-                selectedSpecialistId = child.specialistId ?: specialistId
+                selectedSpecialistId = specialistId ?: child.specialistId
+            } else {
+                scope.launch { snackbarHostState.showSnackbar("Error: No se encontraron los datos del niño.") }
             }
+            isDataLoading = false
+        } else {
+            isDataLoading = false
         }
     }
 
-    // Obtener nombre del especialista si specialistId no es null
-    var specialistName by remember { mutableStateOf<String?>(null) }
+    // --- Obtener nombre del especialista fijo ---
+    var fixedSpecialistName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(specialistId) {
         if (specialistId != null) {
-            val db = AppDatabase.getInstance(context, scope)
-            db.specialistDao().getById(specialistId).collectLatest { specialist ->
-                specialistName = specialist?.let { "${it.firstName} ${it.lastName}" }
+            scope.launch {
+                val specialist = db.specialistDao().getByUserId(specialistId)
+                fixedSpecialistName = specialist?.let { "${it.firstName} ${it.lastName}" }
             }
         }
     }
 
-    // Validaciones
+    // --- Función de Validación ---
     fun validateInputs(): String? {
         if (username.isBlank() || firstName.isBlank() || lastName.isBlank() ||
             dni.isBlank() || condition.isBlank() || sex.isBlank() || guardianName.isBlank() || guardianPhone.isBlank()
         ) {
-            return "Por favor, completa todos los campos"
+            return "Por favor, completa todos los campos obligatorios (*)"
         }
         if (!dni.matches(Regex("\\d{8}"))) {
             return "DNI debe tener exactamente 8 dígitos"
@@ -98,13 +120,21 @@ fun RegisterChildScreen(
         if (!guardianPhone.matches(Regex("\\d{9,15}"))) {
             return "Teléfono debe tener entre 9 y 15 dígitos"
         }
-        if ((childId == null && password.isBlank()) || (password.isNotBlank() && password.length < 6)) {
+        val finalChildId = childId ?: -1L
+        if (finalChildId == -1L && password.isBlank()) {
+            return "La contraseña es obligatoria al registrar (*)"
+        }
+        if (password.isNotBlank() && password.length < 6) {
             return "La contraseña debe tener al menos 6 caracteres"
         }
         if (sex !in listOf("M", "F")) {
-            return "Sexo debe ser 'Masculino' o 'Femenino'"
+            return "Selecciona un sexo válido (*)"
         }
-        if (birthDateMillis > System.currentTimeMillis()) {
+        val selectedCal = Calendar.getInstance().apply { timeInMillis = birthDateMillis }
+        val todayCal = Calendar.getInstance()
+        if (selectedCal.after(todayCal) &&
+            !(selectedCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                    selectedCal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR))) {
             return "La fecha de nacimiento no puede ser futura"
         }
         return null
@@ -112,280 +142,198 @@ fun RegisterChildScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text(if (childId == null || childId == -1L) "Registrar Niño" else "Editar Niño") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                navigationIcon = {
+                    IconButton(onClick = onBack, enabled = !isLoading) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                }
+            )
+        },
         modifier = Modifier.fillMaxSize()
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(24.dp)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.Top
-        ) {
-            Text(if (childId == null) "Registrar Niño" else "Editar Niño", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Sección: Cuenta del Niño
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Cuenta del Niño", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Usuario") },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = childId == null  // No editable en modo edición
-                    )
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text(if (childId == null) "Contraseña" else "Nueva Contraseña (opcional)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+    ) { paddingValues ->
+        if (isDataLoading) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Sección: Datos del Niño
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        } else {
+            Column(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Datos del Niño", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = firstName,
-                        onValueChange = { firstName = it },
-                        label = { Text("Nombres") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = lastName,
-                        onValueChange = { lastName = it },
-                        label = { Text("Apellidos") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = dni,
-                        onValueChange = { dni = it },
-                        label = { Text("DNI") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = condition,
-                        onValueChange = { condition = it },
-                        label = { Text("Condición") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    // Desplegable para Sexo
-                    ExposedDropdownMenuBox(
-                        expanded = expandedSex,
-                        onExpandedChange = { expandedSex = !expandedSex }
-                    ) {
+
+                // --- Card: Cuenta del Niño ---
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Cuenta del Niño", style = MaterialTheme.typography.titleMedium)
                         OutlinedTextField(
-                            value = sexDisplay,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Sexo") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
+                            value = username, onValueChange = { username = it }, label = { Text("Usuario *") },
+                            modifier = Modifier.fillMaxWidth(), enabled = (childId == null || childId == -1L) && !isLoading,
+                            singleLine = true, shape = RoundedCornerShape(12.dp)
                         )
-                        ExposedDropdownMenu(
-                            expanded = expandedSex,
-                            onDismissRequest = { expandedSex = false }
-                        ) {
-                            sexOptions.forEach { (display, value) ->
-                                DropdownMenuItem(
-                                    text = { Text(display) },
-                                    onClick = {
-                                        sexDisplay = display
-                                        sex = value
-                                        expandedSex = false
-                                    }
-                                )
+                        OutlinedTextField(
+                            value = password, onValueChange = { password = it },
+                            label = { Text(if (childId == null || childId == -1L) "Contraseña *" else "Nueva Contraseña (opcional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                                    Icon( if (isPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, null )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            singleLine = true, enabled = !isLoading, shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
+
+                // --- Card: Datos del Niño ---
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Datos del Niño", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField( value = firstName, onValueChange = { firstName = it }, label = { Text("Nombres *") }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading, singleLine = true, shape = RoundedCornerShape(12.dp) )
+                        OutlinedTextField( value = lastName, onValueChange = { lastName = it }, label = { Text("Apellidos *") }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading, singleLine = true, shape = RoundedCornerShape(12.dp) )
+                        OutlinedTextField( value = dni, onValueChange = { dni = it }, label = { Text("DNI (8 dígitos) *") }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading, singleLine = true, shape = RoundedCornerShape(12.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number) )
+                        OutlinedTextField( value = condition, onValueChange = { condition = it }, label = { Text("Condición *") }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading, singleLine = true, shape = RoundedCornerShape(12.dp) )
+                        ExposedDropdownMenuBox( expanded = expandedSex, onExpandedChange = { if (!isLoading) expandedSex = !expandedSex } ) {
+                            OutlinedTextField(
+                                value = sexDisplay, onValueChange = {}, readOnly = true, label = { Text("Sexo *") },
+                                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSex) },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                enabled = !isLoading, shape = RoundedCornerShape(12.dp)
+                            )
+                            ExposedDropdownMenu(expanded = expandedSex, onDismissRequest = { expandedSex = false }) {
+                                sexOptions.forEach { (display, value) ->
+                                    DropdownMenuItem(text = { Text(display) }, onClick = { sexDisplay = display; sex = value; expandedSex = false })
+                                }
                             }
                         }
-                    }
-                    OutlinedTextField(
-                        value = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(birthDateMillis)),
-                        onValueChange = {},
-                        label = { Text("Fecha de Nacimiento") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true },
-                        enabled = false
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Sección: Contacto del Niño
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Contacto del Niño", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = guardianName,
-                        onValueChange = { guardianName = it },
-                        label = { Text("Nombre Apoderado") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = guardianPhone,
-                        onValueChange = { guardianPhone = it },
-                        label = { Text("Teléfono Apoderado") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Especialista asignado o selección
-            if (specialistId == null) {
-                Text("Seleccionar Especialista:")
-                val selectedSpecialistName = selectedSpecialistId
-                    ?.let { id -> specialists.find { it.userId == id } }
-                    ?.let { "${it.firstName} ${it.lastName}" }
-
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { expandedSpecialist = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text(selectedSpecialistName ?: "Elegir especialista")
-                    }
-                    DropdownMenu(expanded = expandedSpecialist, onDismissRequest = { expandedSpecialist = false }) {
-                        if (specialists.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("No hay especialistas") },
-                                onClick = { expandedSpecialist = false }
+                        OutlinedTextField(
+                            value = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(birthDateMillis)),
+                            onValueChange = {}, label = { Text("Fecha de Nacimiento *") },
+                            modifier = Modifier.fillMaxWidth().clickable(enabled = !isLoading) { showDatePicker = true },
+                            enabled = false, shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                        } else {
-                            specialists.forEach { sp ->
-                                DropdownMenuItem(
-                                    text = { Text("${sp.firstName} ${sp.lastName}") },
-                                    onClick = {
-                                        selectedSpecialistId = sp.userId
-                                        expandedSpecialist = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                Text(
-                    "Especialista asignado: ${specialistName ?: "Cargando..."}",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Botón Registrar/Actualizar
-            var isLoading by remember { mutableStateOf(false) }
-            Button(
-                onClick = {
-                    scope.launch {
-                        // Validar inputs
-                        message = validateInputs()
-                        if (message != null) {
-                            snackbarHostState.showSnackbar(message!!)
-                            return@launch
-                        }
-
-                        isLoading = true
-                        val result = if (childId == null) {
-                            // Registro
-                            repo.registerChild(
-                                username = username.trim(),
-                                password = password,
-                                firstName = firstName.trim(),
-                                lastName = lastName.trim(),
-                                dni = dni.trim(),
-                                condition = condition.trim(),
-                                sex = sex.trim(),
-                                birthDateMillis = birthDateMillis,
-                                guardianName = guardianName.trim(),
-                                guardianPhone = guardianPhone.trim(),
-                                specialistId = selectedSpecialistId
-                            )
-                        } else {
-                            // Actualización
-                            repo.updateChild(
-                                childId = childId,
-                                firstName = firstName.trim(),
-                                lastName = lastName.trim(),
-                                dni = dni.trim(),
-                                condition = condition.trim(),
-                                sex = sex.trim(),
-                                birthDateMillis = birthDateMillis,
-                                guardianName = guardianName.trim(),
-                                guardianPhone = guardianPhone.trim(),
-                                specialistId = selectedSpecialistId,
-                                password = if (password.isNotBlank()) password else null
-                            )
-                        }
-                        isLoading = false
-                        message = result.fold(
-                            onSuccess = { if (childId == null) "Se registró al niño exitosamente ✅" else "Niño actualizado exitosamente ✅" },
-                            onFailure = { "Error: ${it.message}" }
                         )
-                        snackbarHostState.showSnackbar(message!!)
                     }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
+                }
+
+                // --- Card: Contacto del Niño ---
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Contacto del Niño", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField( value = guardianName, onValueChange = { guardianName = it }, label = { Text("Nombre Apoderado *") }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading, singleLine = true, shape = RoundedCornerShape(12.dp) )
+                        OutlinedTextField( value = guardianPhone, onValueChange = { guardianPhone = it }, label = { Text("Teléfono Apoderado (9-15 dígitos) *") }, modifier = Modifier.fillMaxWidth(), enabled = !isLoading, singleLine = true, shape = RoundedCornerShape(12.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone) )
+                    }
+                }
+
+                // --- Especialista asignado o selección ---
+                if (fixedSpecialistName != null) {
+                    Text("Especialista Asignado:", style = MaterialTheme.typography.titleMedium)
+                    Text(fixedSpecialistName ?: "Cargando...", style = MaterialTheme.typography.bodyLarge)
                 } else {
-                    Text(if (childId == null) "Registrar" else "Actualizar")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text("Volver")
-            }
-
-            // DatePicker Dialog
-            if (showDatePicker) {
-                val datePickerState = rememberDatePickerState(initialSelectedDateMillis = birthDateMillis)
-                DatePickerDialog(
-                    onDismissRequest = { showDatePicker = false },
-                    confirmButton = {
-                        Button(onClick = {
-                            datePickerState.selectedDateMillis?.let { birthDateMillis = it }
-                            showDatePicker = false
-                        }) {
-                            Text("Aceptar")
-                        }
-                    },
-                    dismissButton = {
-                        Button(onClick = { showDatePicker = false }) {
-                            Text("Cancelar")
+                    Text("Seleccionar Especialista (Opcional):", style = MaterialTheme.typography.titleMedium)
+                    val selectedSpecialistName = selectedSpecialistId?.let { id -> specialists.find { it.userId == id } }?.let { "${it.firstName} ${it.lastName}" } ?: "Ninguno"
+                    ExposedDropdownMenuBox( expanded = expandedSpecialist, onExpandedChange = { if (!isLoading) expandedSpecialist = !expandedSpecialist } ) {
+                        OutlinedTextField(
+                            value = selectedSpecialistName, onValueChange = {}, readOnly = true,
+                            label = { Text("Especialista") }, modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSpecialist) },
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                            enabled = !isLoading, shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(expanded = expandedSpecialist, onDismissRequest = { expandedSpecialist = false }) {
+                            DropdownMenuItem(text = { Text("Ninguno") }, onClick = { selectedSpecialistId = null; expandedSpecialist = false })
+                            if (specialists.isEmpty()) { DropdownMenuItem(text = { Text("No hay especialistas") }, onClick = {}, enabled = false) }
+                            else { specialists.forEach { sp -> DropdownMenuItem(text = { Text("${sp.firstName} ${sp.lastName}") }, onClick = { selectedSpecialistId = sp.userId; expandedSpecialist = false }) } }
                         }
                     }
-                ) {
-                    DatePicker(state = datePickerState)
                 }
-            }
-        }
-    }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // --- Botones de Acción ---
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            val validationError = validateInputs()
+                            if (validationError != null) { scope.launch { snackbarHostState.showSnackbar(validationError) }; return@Button }
+                            scope.launch {
+                                isLoading = true
+                                val finalChildId = childId ?: -1L
+                                val result = if (finalChildId == -1L) {
+                                    repo.registerChild( username = username.trim(), password = password, firstName = firstName.trim(), lastName = lastName.trim(), dni = dni.trim(), condition = condition.trim(), sex = sex.trim(), birthDateMillis = birthDateMillis, guardianName = guardianName.trim(), guardianPhone = guardianPhone.trim(), specialistId = selectedSpecialistId )
+                                } else {
+                                    repo.updateChild( childId = finalChildId, firstName = firstName.trim(), lastName = lastName.trim(), dni = dni.trim(), condition = condition.trim(), sex = sex.trim(), birthDateMillis = birthDateMillis, guardianName = guardianName.trim(), guardianPhone = guardianPhone.trim(), specialistId = selectedSpecialistId, password = if (password.isNotBlank()) password else null )
+                                }
+                                isLoading = false
+                                val messageToShow = result.fold( onSuccess = { if (finalChildId == -1L) "Niño registrado ✅" else "Niño actualizado ✅" }, onFailure = { "Error: ${it.message} ❌" } )
+                                snackbarHostState.showSnackbar(messageToShow)
+                                if (result.isSuccess) {
+                                    if (finalChildId == -1L) {
+                                        username = ""; password = ""; firstName = ""; lastName = ""; dni = ""; condition = ""; sex = ""; sexDisplay = ""; birthDateMillis = System.currentTimeMillis(); guardianName = ""; guardianPhone = ""; if (fixedSpecialistName == null) selectedSpecialistId = null
+                                    } else { onBack() }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp), enabled = !isLoading, shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (isLoading) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary) }
+                        else { Text(if (childId == null || childId == -1L) "Registrar" else "Actualizar") }
+                    }
+                } // Fin Column Botones
+
+                // --- DatePicker Dialog ---
+                if (showDatePicker) {
+                    val selectableDatesObject = remember {
+                        object : SelectableDates {
+                            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                                return utcTimeMillis <= System.currentTimeMillis()
+                            }
+                            override fun isSelectableYear(year: Int): Boolean {
+                                return year >= 1980 && year <= Calendar.getInstance().get(Calendar.YEAR)
+                            }
+                        }
+                    }
+                    val datePickerState = rememberDatePickerState(
+                        initialSelectedDateMillis = birthDateMillis,
+                        yearRange = (1980..(Calendar.getInstance().get(Calendar.YEAR))),
+                        selectableDates = selectableDatesObject
+                    )
+                    DatePickerDialog(
+                        onDismissRequest = { showDatePicker = false },
+                        confirmButton = {
+                            Button(onClick = {
+                                datePickerState.selectedDateMillis?.let { selectedMillis ->
+                                    if (selectedMillis <= System.currentTimeMillis()) { birthDateMillis = selectedMillis }
+                                    else { scope.launch { snackbarHostState.showSnackbar("Fecha no puede ser futura.") } }
+                                }
+                                showDatePicker = false
+                            }) { Text("Aceptar") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+                        }
+                    ) {
+                        DatePicker(state = datePickerState)
+                    }
+                } // Fin DatePicker Dialog
+            } // Fin Column principal
+        } // Fin else isDataLoading
+    } // Fin Scaffold
 }
