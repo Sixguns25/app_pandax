@@ -1,16 +1,16 @@
 package com.tesis.aplicacionpandax
 
 import android.os.Bundle
-import android.util.Log
+import android.util.Log // Importar Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.fillMaxSize // Importar
+import androidx.compose.foundation.layout.wrapContentHeight // Importar
+import androidx.compose.material3.Text // Importar Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.Modifier // Importar Modifier
+import androidx.compose.ui.text.style.TextAlign // Importar TextAlign
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -21,7 +21,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tesis.aplicacionpandax.data.AppDatabase
-import com.tesis.aplicacionpandax.data.entity.Specialist
+import com.tesis.aplicacionpandax.data.entity.Specialist // Importar Specialist
 import com.tesis.aplicacionpandax.data.entity.GameSession // Importar GameSession
 import com.tesis.aplicacionpandax.repository.AuthRepository
 import com.tesis.aplicacionpandax.repository.ProgressRepository
@@ -95,7 +95,6 @@ class MainActivity : ComponentActivity() {
                     }
 
                     // --- Admin ---
-                    // (Rutas de Admin: AdminHome, RegisterSpecialist, RegisterChild, etc. sin cambios)
                     composable(NavRoutes.AdminHome.route) {
                         AdminHomeScreen(
                             onRegisterSpecialist = { navController.navigate(NavRoutes.RegisterSpecialist.route) },
@@ -121,15 +120,28 @@ class MainActivity : ComponentActivity() {
                         val specialistIdArg = backStackEntry.arguments?.getLong("specialistId") ?: -1L
                         RegisterSpecialistScreen( repo = authRepo, db = db, specialistId = specialistIdArg, onBack = { navController.popBackStack() } )
                     }
+                    // Registrar niño (Admin) - CORREGIDO
                     composable(NavRoutes.RegisterChild.route) {
-                        RegisterChildScreen( repo = authRepo, specialists = specialists, onBack = { navController.popBackStack() }, db = db )
+                        RegisterChildScreen(
+                            repo = authRepo,
+                            specialists = specialists,
+                            onBack = { navController.popBackStack() },
+                            db = db // <-- PARÁMETRO db AÑADIDO
+                        )
                     }
+                    // Editar niño (Admin) - CORREGIDO
                     composable(
                         route = "${NavRoutes.RegisterChild.route}/{childId}",
                         arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
                     ) { backStackEntry ->
                         val childIdArg = backStackEntry.arguments?.getLong("childId") ?: -1L
-                        RegisterChildScreen( repo = authRepo, specialists = specialists, onBack = { navController.popBackStack() }, childId = childIdArg, db = db )
+                        RegisterChildScreen(
+                            repo = authRepo,
+                            specialists = specialists,
+                            onBack = { navController.popBackStack() },
+                            childId = childIdArg,
+                            db = db // <-- PARÁMETRO db AÑADIDO
+                        )
                     }
                     composable(NavRoutes.ManageSpecialties.route) {
                         SpecialtiesManagementScreen( db = db, onBack = { navController.popBackStack() } )
@@ -150,13 +162,14 @@ class MainActivity : ComponentActivity() {
 
 
                     // --- Specialist ---
+                    // CORREGIDO
                     composable(NavRoutes.SpecialistHome.route) {
                         SpecialistHomeScreen(
                             specialistId = loggedUserId ?: -1,
                             childrenFlow = db.childDao().getChildrenForSpecialist(loggedUserId ?: -1),
                             progressRepo = progressRepo,
                             db = db,
-                            authRepo = authRepo,
+                            authRepo = authRepo, // <-- PARÁMETRO authRepo AÑADIDO
                             onLogout = {
                                 loggedUserId = null
                                 navController.navigate(NavRoutes.Login.route) {
@@ -165,15 +178,17 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+                    // Registrar niño (Specialist) - CORREGIDO
                     composable(NavRoutes.SpecialistRegisterChild.route) {
                         RegisterChildScreen(
                             repo = authRepo,
                             specialists = specialists,
                             onBack = { navController.popBackStack() },
                             specialistId = loggedUserId,
-                            db = db
+                            db = db // <-- PARÁMETRO db AÑADIDO
                         )
                     }
+                    // Editar niño (Specialist) - CORREGIDO
                     composable(
                         route = "${NavRoutes.SpecialistRegisterChild.route}/{childId}",
                         arguments = listOf(navArgument("childId") { type = NavType.LongType; defaultValue = -1L })
@@ -185,12 +200,13 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() },
                             specialistId = loggedUserId,
                             childId = childIdArg,
-                            db = db
+                            db = db // <-- PARÁMETRO db AÑADIDO
                         )
                     }
 
 
                     // --- Child ---
+                    // CORREGIDO
                     composable(NavRoutes.ChildHome.route) {
                         val childId = loggedUserId ?: -1L
                         val childFlow = db.childDao().getChildByUserId(childId)
@@ -208,7 +224,7 @@ class MainActivity : ComponentActivity() {
                             specialist = specialist,
                             progressRepo = progressRepo,
                             db = db,
-                            navController = navController, // Pasa el NavController principal
+                            navController = navController, // <-- PARÁMETRO navController AÑADIDO
                             onLogout = {
                                 loggedUserId = null
                                 navController.navigate(NavRoutes.Login.route) {
@@ -218,7 +234,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // --- Rutas Comunes (Admin/Specialist) ---
+                    // --- Rutas Comunes ---
                     composable(
                         route = "child_detail/{childId}",
                         arguments = listOf(navArgument("childId") { type = NavType.LongType })
@@ -226,6 +242,7 @@ class MainActivity : ComponentActivity() {
                         val childIdArg = backStackEntry.arguments?.getLong("childId") ?: -1L
                         ChildDetailScreen( navController = navController, db = db, childId = childIdArg )
                     }
+                    // Progreso niño (CORREGIDO)
                     composable(
                         route = "child_progress/{childId}",
                         arguments = listOf(navArgument("childId") { type = NavType.LongType })
@@ -239,36 +256,47 @@ class MainActivity : ComponentActivity() {
                                 childSpecialtyId = spec?.specialtyId
                             }
                         }
+
                         ChildProgressDetailScreen(
                             childUserId = childIdArg,
                             progressRepo = progressRepo,
-                            db = db,
-                            navController = navController,
-                            specialtyId = childSpecialtyId
+                            db = db, // <-- PARÁMETRO db AÑADIDO
+                            navController = navController, // <-- PARÁMETRO navController AÑADIDO
+                            specialtyId = childSpecialtyId // <-- PARÁMETRO specialtyId AÑADIDO
                         )
                     }
 
 
-                    // --- 👇👇👇 RUTAS DE JUEGOS AÑADIDAS AQUÍ 👇👇👇 ---
-                    // (Accesibles desde ChildHomeScreen -> GamesMenuScreen)
+                    // --- 👇👇👇 RUTAS DE JUEGOS AÑADIDAS/CORREGIDAS 👇👇👇 ---
 
                     composable(
-                        route = "memory_game/{childUserId}",
-                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                        // Ruta actualizada para incluir el nivel
+                        route = "memory_game/{childUserId}/{level}",
+                        arguments = listOf(
+                            navArgument("childUserId") { type = NavType.LongType },
+                            navArgument("level") { type = NavType.IntType } // Argumento de nivel
+                        )
                     ) { backStackEntry ->
-                        // 👇 Cambia el valor por defecto a -1L
                         val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
-                        // Añade una verificación
+                        val level = backStackEntry.arguments?.getInt("level") ?: 1 // Extraer nivel
+
                         if (childId == -1L) {
                             Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
                         } else {
                             MemoryGame(
                                 childUserId = childId,
                                 progressRepo = progressRepo,
-                                onGameEnd = { stars, timeTaken, attempts ->
+                                level = level, // Pasar el nivel
+                                // onGameEnd ahora acepta 4 parámetros
+                                onGameEnd = { stars, timeTaken, attempts, gameLevel ->
                                     coroutineScope.launch {
                                         progressRepo.saveSession(GameSession(
-                                            childUserId = childId, gameType = "MEMORY", stars = stars, timeTaken = timeTaken, attempts = attempts
+                                            childUserId = childId,
+                                            gameType = "MEMORY",
+                                            stars = stars,
+                                            timeTaken = timeTaken,
+                                            attempts = attempts,
+                                            level = gameLevel // Guardar el nivel
                                         ))
                                     }
                                     navController.popBackStack()
@@ -281,23 +309,16 @@ class MainActivity : ComponentActivity() {
                         route = "emotions_game/{childUserId}",
                         arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
                     ) { backStackEntry ->
-                        // 👇 Cambia el valor por defecto a -1L
                         val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
-                        // Añade una verificación
                         if (childId == -1L) {
                             Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
                         } else {
                             EmotionsGame(
                                 childUserId = childId,
                                 onSessionComplete = { session ->
-                                    // Verifica aquí también por si acaso
-                                    if (session.childUserId != -1L) {
-                                        coroutineScope.launch {
-                                            progressRepo.saveSession(session)
-                                        }
-                                    } else {
-                                        Log.e("MainActivity", "Intento de guardar sesión con childUserId inválido (-1)")
-                                        // Opcionalmente mostrar Snackbar de error
+                                    // EmotionsGame NO tiene niveles (aún), así que guardamos la sesión tal cual
+                                    coroutineScope.launch {
+                                        progressRepo.saveSession(session)
                                     }
                                     navController.popBackStack()
                                 }
@@ -306,20 +327,26 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable(
-                        route = "coordination_game/{childUserId}",
-                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                        route = "coordination_game/{childUserId}/{level}", // 1. Ruta actualizada
+                        arguments = listOf(
+                            navArgument("childUserId") { type = NavType.LongType },
+                            navArgument("level") { type = NavType.IntType } // 2. Argumento de nivel añadido
+                        )
                     ) { backStackEntry ->
-                        // 👇 Cambia el valor por defecto a -1L
                         val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
-                        // Añade una verificación
+                        val level = backStackEntry.arguments?.getInt("level") ?: 1 // 3. Extraer nivel
+
                         if (childId == -1L) {
                             Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
                         } else {
                             CoordinationGame(
                                 childUserId = childId,
                                 progressRepo = progressRepo,
-                                onGameEnd = { stars, timeTaken, attempts ->
-                                    // CoordinationGame ya guarda internamente, solo volvemos
+                                level = level, // 4. Pasar el nivel
+                                // 5. Actualizar lambda onGameEnd (CoordinationGame ya guarda internamente)
+                                onGameEnd = { stars, timeTaken, attempts, gameLevel ->
+                                    // El juego ya guarda la sesión internamente (incluyendo el nivel).
+                                    // Solo necesitamos volver atrás.
                                     navController.popBackStack()
                                 }
                             )
@@ -330,9 +357,7 @@ class MainActivity : ComponentActivity() {
                         route = "pronunciation_game/{childUserId}",
                         arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
                     ) { backStackEntry ->
-                        // 👇 Cambia el valor por defecto a -1L
                         val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
-                        // Añade una verificación
                         if (childId == -1L) {
                             Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
                         } else {
@@ -340,14 +365,13 @@ class MainActivity : ComponentActivity() {
                                 childUserId = childId,
                                 progressRepo = progressRepo,
                                 onGameEnd = { stars, timeTaken, attempts ->
-                                    // PronunciationGame ya guarda internamente, solo volvemos
+                                    // PronunciationGame ya guarda internamente (con level=1 por defecto)
                                     navController.popBackStack()
                                 }
                             )
                         }
                     }
-                    // --- 👆👆👆 FIN DE RUTAS DE JUEGOS AÑADIDAS 👆👆👆 ---
-
+                    // --- 👆👆👆 FIN DE RUTAS DE JUEGOS 👆👆👆 ---
 
                 } // Fin NavHost
             } // Fin AplicacionPandaxTheme

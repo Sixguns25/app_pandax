@@ -22,5 +22,6 @@ data class GameSession(
     val stars: Int,
     val timeTaken: Long,    // en millis
     val attempts: Int,
+    val level: Int = 1,
     val timestamp: Long = System.currentTimeMillis()  // Fecha de la sesión
 )

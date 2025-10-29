@@ -1,18 +1,19 @@
 package com.tesis.aplicacionpandax.ui.screens.child
 
-import android.util.Log // Mantener Log si es útil para depuración
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape // Para formas
-import androidx.compose.material.icons.Icons // Para iconos
-import androidx.compose.material.icons.filled.* // Importar iconos necesarios
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Leaderboard // <-- IMPORTACIÓN DE ICONO AÑADIDA
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector // Para iconos
-import androidx.compose.ui.text.font.FontWeight // Para estilo de texto
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tesis.aplicacionpandax.data.entity.Child
@@ -20,7 +21,7 @@ import com.tesis.aplicacionpandax.data.entity.Game
 import com.tesis.aplicacionpandax.data.entity.GameSession
 import com.tesis.aplicacionpandax.repository.ProgressRepository
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.map // Asegúrate de tener esta importación
+import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -74,7 +75,7 @@ fun ChildProgressScreen(
             baseFlow.map { sessionList ->
                 sessionList.filter { availableGameTypes.contains(it.gameType) }
             }.collectLatest { filteredSessions ->
-                sessions = filteredSessions
+                sessions = filteredSessions // Ya están ordenadas por el DAO (DESC)
                 averageStars = if (filteredSessions.isNotEmpty()) {
                     filteredSessions.map { it.stars }.average().toFloat()
                 } else {
@@ -97,7 +98,6 @@ fun ChildProgressScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                // Sin navigationIcon porque es parte del BottomNav
             )
         },
         modifier = Modifier.fillMaxSize()
@@ -105,15 +105,15 @@ fun ChildProgressScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Aplica padding de Scaffold
-                .padding(16.dp), // Padding interno adicional
+                .padding(paddingValues)
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Espacio entre elementos principales
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Mensaje de error si faltan datos
             if (child == null || specialtyId == null) {
                 Text( "😕 No se pudo cargar el progreso.", textAlign = TextAlign.Center )
-                return@Scaffold // Salir temprano si faltan datos
+                return@Scaffold
             }
 
             // --- Filtro por tipo de juego (Estilizado) ---
@@ -130,34 +130,31 @@ fun ChildProgressScreen(
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.weight(1f) // Ocupa el espacio restante
+                    modifier = Modifier.weight(1f)
                 ) {
-                    // Usamos OutlinedTextField para consistencia
                     OutlinedTextField(
-                        value = availableGames.find { it.name == selectedGameType }?.displayName ?: "Todos", // Muestra displayName
+                        value = availableGames.find { it.name == selectedGameType }?.displayName ?: "Todos",
                         onValueChange = {},
                         readOnly = true,
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        shape = RoundedCornerShape(12.dp), // Consistencia
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(), // Colores por defecto para dropdown
-                        enabled = !isLoadingGames && !isLoadingSessions // Deshabilita si carga
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        enabled = !isLoadingGames && !isLoadingSessions
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
                     ) {
-                        // Opción "Todos"
                         DropdownMenuItem(
                             text = { Text("Todos") },
                             onClick = { selectedGameType = "Todos"; expanded = false }
                         )
-                        // Opciones de juegos disponibles
                         availableGames.forEach { game ->
                             DropdownMenuItem(
-                                text = { Text(game.displayName) }, // Muestra displayName
+                                text = { Text(game.displayName) },
                                 onClick = {
-                                    selectedGameType = game.name // Guarda el 'name' interno
+                                    selectedGameType = game.name
                                     expanded = false
                                 }
                             )
@@ -183,14 +180,13 @@ fun ChildProgressScreen(
                     if (isLoadingSessions) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimaryContainer)
                     } else {
-                        // Usamos InfoItemSimple (variante sin etiqueta fija)
                         InfoItemSimple(icon = Icons.Filled.Stars, text = "Estrellas promedio: ${"%.1f".format(averageStars)} ⭐")
                         InfoItemSimple(icon = Icons.Filled.VideogameAsset, text = "Juegos jugados: ${sessions.size} 🎲")
-                        Text( // Mensaje motivacional
+                        Text(
                             text = when {
                                 averageStars >= 2.5 -> "¡Eres una superestrella! 🌟 ¡Sigue brillando!"
                                 averageStars >= 1.5 -> "¡Buen trabajo! 😄 ¡Puedes ganar más estrellas!"
-                                sessions.isEmpty() && !isLoadingGames -> "¡Juega para ganar tus primeras estrellas! 🚀" // Muestra solo si no está cargando juegos
+                                sessions.isEmpty() && !isLoadingGames -> "¡Juega para ganar tus primeras estrellas! 🚀"
                                 else -> "¡Sigue practicando, estás mejorando! 💪"
                             },
                             style = MaterialTheme.typography.bodyLarge,
@@ -198,16 +194,16 @@ fun ChildProgressScreen(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )
-                    } // Fin else (no isLoadingSessions)
-                } // Fin Column interna
-            } // Fin Card Resumen
+                    }
+                }
+            }
 
             // --- Lista de sesiones ---
             Text("Historial de Juegos", style = MaterialTheme.typography.titleMedium)
 
-            Box(modifier = Modifier.weight(1f)) { // Ocupa el espacio restante
+            Box(modifier = Modifier.weight(1f)) {
                 when {
-                    isLoadingSessions || isLoadingGames -> { // Muestra carga si alguna está activa
+                    isLoadingSessions || isLoadingGames -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
                     sessions.isEmpty() -> {
@@ -221,14 +217,14 @@ fun ChildProgressScreen(
                     else -> {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(bottom = 8.dp) // Pequeño padding inferior
+                            contentPadding = PaddingValues(bottom = 8.dp)
                         ) {
-                            items(sessions, key = { it.sessionId }) { session -> // Usa sessionId como key
-                                SessionItem(session, availableGames) // Pasa lista de juegos para obtener displayName
+                            items(sessions, key = { it.sessionId }) { session ->
+                                SessionItem(session, availableGames)
                             }
-                        } // Fin LazyColumn
-                    } // Fin else (hay sesiones)
-                } // Fin when
+                        }
+                    }
+                }
             } // Fin Box lista
         } // Fin Column principal
     } // Fin Scaffold
@@ -237,30 +233,35 @@ fun ChildProgressScreen(
 // --- Composable SessionItem Mejorado ---
 @Composable
 fun SessionItem(session: GameSession, availableGames: List<Game>) {
-    // Busca el displayName del juego usando el gameType de la sesión
     val gameDisplayName = availableGames.find { it.name == session.gameType }?.displayName ?: session.gameType
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp), // Consistencia
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), // Color diferente al resumen
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp) // Espacio entre ítems de info
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             val date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(session.timestamp))
-            // Título con nombre del juego
             Text(
-                text = "🎮 $gameDisplayName", // Muestra displayName
-                style = MaterialTheme.typography.titleMedium, // Un poco más grande
+                text = "🎮 $gameDisplayName",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            Divider(modifier = Modifier.padding(bottom = 4.dp)) // Separador
-            // Info con iconos
+            Divider(modifier = Modifier.padding(bottom = 4.dp))
             InfoItemSimple(icon = Icons.Filled.Event, text = "Fecha: $date")
+
+            // --- 👇 AÑADIDO AQUÍ ---
+            // Muestra el nivel solo si el juego es "MEMORY" (o añade más juegos si tienen niveles)
+            if (session.gameType == "MEMORY" || session.gameType == "COORDINATION" || session.gameType == "EMOTIONS" || session.gameType == "PRONUNCIATION") {
+                InfoItemSimple(icon = Icons.Filled.Leaderboard, text = "Nivel Jugado: ${session.level}")
+            }
+            // --- FIN DE LA ADICIÓN ---
+
             InfoItemSimple(icon = Icons.Filled.Star, text = "Estrellas: ${session.stars} ${"⭐".repeat(session.stars)}")
             InfoItemSimple(icon = Icons.Filled.Timer, text = "Tiempo: ${session.timeTaken / 1000} seg")
             InfoItemSimple(icon = Icons.Filled.Repeat, text = "Intentos: ${session.attempts}")
@@ -275,8 +276,8 @@ private fun InfoItemSimple(icon: ImageVector, text: String) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(18.dp), // Icono pequeño
-            tint = LocalContentColor.current.copy(alpha = 0.8f) // Tinte sutil
+            modifier = Modifier.size(18.dp),
+            tint = LocalContentColor.current.copy(alpha = 0.8f)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = text, style = MaterialTheme.typography.bodyMedium)
