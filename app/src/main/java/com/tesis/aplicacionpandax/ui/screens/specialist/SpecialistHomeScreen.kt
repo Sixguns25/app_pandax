@@ -79,7 +79,10 @@ fun SpecialistHomeScreen(
                 )
             }
             composable("profile") {
-                SpecialistProfileScreen(specialistId)
+                SpecialistProfileScreen(
+                    specialistId = specialistId,
+                    db = db // <-- AÑADE ESTE PARÁMETRO
+                )
             }
             composable("settings") {
                 SpecialistSettingsScreen(

@@ -86,7 +86,12 @@ fun ChildHomeScreen(
             modifier = Modifier.padding(padding)
         ) {
             composable("home") {
-                ChildHomeSection(child, specialist, db)
+                ChildHomeSection(
+                    child = child,
+                    specialist = specialist,
+                    db = db,
+                    navController = navController
+                )
             }
             composable("games") {
                 GamesMenuScreen(
