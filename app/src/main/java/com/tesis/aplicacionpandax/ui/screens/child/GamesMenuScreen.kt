@@ -54,8 +54,6 @@ fun GamesMenuScreen(
         else -> "Juegos"
     }
 
-    // --- 1. AÑADIR ESTADO PARA EL DIÁLOGO (REUTILIZABLE) ---
-    // Usaremos un estado para rastrear qué juego necesita selección de nivel
     var gameRequiringLevel by remember { mutableStateOf<Game?>(null) }
 
     Scaffold(
@@ -96,13 +94,13 @@ fun GamesMenuScreen(
                     ) {
                         items(games, key = { it.id }) { game ->
                             GameGridItem(game = game) {
-                                // --- 2. LÓGICA DE CLIC ACTUALIZADA ---
                                 if (child != null) {
+                                    // --- 👇 LÓGICA DE CLIC ACTUALIZADA 👇 ---
                                     // Comprueba si el juego requiere selección de nivel
-                                    if (game.name == "MEMORY" || game.name == "COORDINATION") {
-                                        gameRequiringLevel = game // Guarda el juego y muestra el diálogo
+                                    if (game.name == "MEMORY" || game.name == "COORDINATION" || game.name == "EMOTIONS") {
+                                        gameRequiringLevel = game // Muestra el diálogo de nivel
                                     } else {
-                                        // Para otros juegos (Emotions, Pronunciation), navega directamente
+                                        // Para otros juegos (Pronunciation), navega directamente
                                         val route = game.route.replace("{childUserId}", child.userId.toString())
                                         navController.navigate(route)
                                     }
@@ -113,19 +111,20 @@ fun GamesMenuScreen(
                 } // Fin else
             } // Fin when
 
-            // --- 3. DIÁLOGO GENÉRICO PARA SELECCIÓN DE NIVEL ---
+            // --- Diálogo Genérico (Sin cambios, ya maneja gameRequiringLevel) ---
             if (gameRequiringLevel != null && child != null) {
                 LevelSelectionDialog(
                     gameName = gameRequiringLevel!!.displayName,
-                    gameType = gameRequiringLevel!!.name, // Pasa el tipo de juego ("MEMORY" o "COORDINATION")
-                    onDismiss = { gameRequiringLevel = null }, // Cierra el diálogo
+                    gameType = gameRequiringLevel!!.name, // Pasa el tipo
+                    onDismiss = { gameRequiringLevel = null },
                     onLevelSelected = { level ->
-                        val routeBase = gameRequiringLevel!!.name.lowercase() + "_game" // "memory_game" o "coordination_game"
+                        // Construye la ruta base (ej. "memory_game", "emotions_game")
+                        val routeBase = gameRequiringLevel!!.name.lowercase() + "_game"
                         val finalRoute = "$routeBase/${child.userId}/$level"
 
                         Log.d("GamesMenuScreen", "Navegando a: $finalRoute")
                         navController.navigate(finalRoute)
-                        gameRequiringLevel = null // Cierra el diálogo después de navegar
+                        gameRequiringLevel = null // Cierra el diálogo
                     }
                 )
             }
@@ -137,7 +136,6 @@ fun GamesMenuScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GameGridItem(game: Game, onClick: () -> Unit) {
-    // Mapea el nombre interno del juego a un recurso drawable
     val imageRes = when (game.name) {
         "MEMORY" -> R.drawable.memory_game_preview
         "EMOTIONS" -> R.drawable.emotions_game_preview
@@ -182,18 +180,21 @@ private fun GameGridItem(game: Game, onClick: () -> Unit) {
     }
 }
 
-// --- 4. DIÁLOGO DE NIVEL ACTUALIZADO (MÁS GENÉRICO) ---
+// --- 👇 DIÁLOGO DE NIVEL ACTUALIZADO 👇 ---
 @Composable
 private fun LevelSelectionDialog(
     gameName: String,
-    gameType: String, // "MEMORY" o "COORDINATION"
+    gameType: String, // "MEMORY", "COORDINATION", o "EMOTIONS"
     onDismiss: () -> Unit,
     onLevelSelected: (Int) -> Unit
 ) {
     // Define los textos de los niveles basados en el tipo de juego
-    val level1Text = if (gameType == "MEMORY") "Nivel 1 (Fácil: 2x2)" else "Nivel 1 (Fácil)"
-    val level2Text = if (gameType == "MEMORY") "Nivel 2 (Normal: 2x4)" else "Nivel 2 (Normal)"
-    val level3Text = if (gameType == "MEMORY") "Nivel 3 (Difícil: 3x4)" else "Nivel 3 (Difícil)"
+    val (level1Text, level2Text, level3Text) = when(gameType) {
+        "MEMORY" -> Triple("Nivel 1 (Fácil: 2x2)", "Nivel 2 (Normal: 2x4)", "Nivel 3 (Difícil: 3x4)")
+        "COORDINATION" -> Triple("Nivel 1 (Fácil)", "Nivel 2 (Normal)", "Nivel 3 (Difícil)")
+        "EMOTIONS" -> Triple("Nivel 1 (Fácil: 2 Opciones)", "Nivel 2 (Normal: 4 Opciones)", "Nivel 3 (Difícil: 6 Emociones)")
+        else -> Triple("Nivel 1", "Nivel 2", "Nivel 3") // Default
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,

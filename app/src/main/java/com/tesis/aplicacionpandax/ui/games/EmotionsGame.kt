@@ -7,30 +7,51 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape // Para botones
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign // Importar
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tesis.aplicacionpandax.R
-import com.tesis.aplicacionpandax.data.entity.GameSession
+// QUITA: import com.tesis.aplicacionpandax.data.entity.GameSession
 import kotlinx.coroutines.delay
+import kotlin.random.Random // Importar Random
+
+// --- Definiciones de Clases de Datos (fuera del Composable) ---
+
+// Define la estructura de una emoción
+data class Emotion(val drawableId: Int, val name: String)
+
+// Define la estructura para los criterios de estrellas
+data class StarCriteria(val score3Stars: Int, val time3Stars: Int, val score2Stars: Int, val time2Stars: Int)
+
+// --- CORRECCIÓN 1: Reemplaza Triple con una data class ---
+// Define la configuración del nivel
+private data class LevelConfig(
+    val emotionPool: List<Emotion>,
+    val numRounds: Int,
+    val numOptions: Int,
+    val starCriteria: StarCriteria
+)
 
 @Composable
 fun EmotionsGame(
     childUserId: Long,
-    onSessionComplete: (GameSession) -> Unit,
+    level: Int, // <-- Parámetro de nivel
+    onGameEnd: (stars: Int, timeTaken: Long, attempts: Int, level: Int) -> Unit, // <-- Callback actualizado
     modifier: Modifier = Modifier
 ) {
-    var score by remember { mutableStateOf(0) }  // Aciertos (0-4)
-    var attempts by remember { mutableStateOf(0) }
+    // --- ESTADOS ---
+    var score by remember { mutableStateOf(0) }  // Aciertos
+    var currentRound by remember { mutableStateOf(0) } // Ronda actual (0, 1, 2...)
     var startTime by remember { mutableStateOf<Long?>(null) }
     var elapsedTime by remember { mutableStateOf(0L) }
     var showFeedback by remember { mutableStateOf(false) }
@@ -39,64 +60,102 @@ fun EmotionsGame(
     var stars by remember { mutableStateOf(0) }
     var showInstructions by remember { mutableStateOf(true) }
 
-    // Lista de emociones con sus imágenes
-    val emotions = listOf(
-        Pair(R.drawable.happy_face, "Feliz"),
-        Pair(R.drawable.sad_face, "Triste"),
-        Pair(R.drawable.angry_face, "Enojado"),
-        Pair(R.drawable.surprised_face, "Sorprendido")
-    )
-    // Lista mutable para evitar repeticiones
-    var availableEmotions by remember { mutableStateOf(emotions.shuffled()) }
-    var currentEmotion by remember { mutableStateOf(availableEmotions.firstOrNull() ?: emotions[0]) }
-    val options = emotions.map { it.second }.shuffled()
+    // --- LÓGICA DE NIVELES ---
 
-    // Contexto para text-to-speech (opcional)
-    val context = LocalContext.current
+    // Pools de emociones
+    // NOTA: Añade R.drawable.scared_face y R.drawable.bored_face a tus 'drawable'
+    // (Uso surprised y sad como placeholders temporales)
+    val easyEmotions = remember { listOf(
+        Emotion(R.drawable.happy_face, "Feliz"),
+        Emotion(R.drawable.sad_face, "Triste")
+    )}
+    val normalEmotions = remember { easyEmotions + listOf(
+        Emotion(R.drawable.angry_face, "Enojado"),
+        Emotion(R.drawable.surprised_face, "Sorprendido")
+    )}
+    val hardEmotions = remember { normalEmotions + listOf(
+        // TODO: Reemplaza estos placeholders por tus propios drawables
+        Emotion(R.drawable.surprised_face, "Asustado"), // Placeholder
+        Emotion(R.drawable.sad_face, "Aburrido")      // Placeholder
+    )}
 
-    // Actualizar cronómetro cada segundo
+    // Propiedades del nivel (Usando LevelConfig en lugar de Triple)
+    val (emotionPool, numRounds, numOptions, starCriteria) = remember(level) {
+        when (level) {
+            1 -> LevelConfig(easyEmotions, 4, 2, StarCriteria(4, 30, 3, 45)) // 4 rondas, 2 opciones
+            3 -> LevelConfig(hardEmotions, 6, 4, StarCriteria(6, 40, 4, 60)) // 6 rondas, 4 opciones
+            else -> LevelConfig(normalEmotions, 4, 4, StarCriteria(4, 20, 3, 40)) // Nivel 2
+        }
+    }
+
+    // Lista de preguntas para esta sesión
+    val questionList by remember {
+        mutableStateOf(
+            List(numRounds) { emotionPool.random(Random(System.currentTimeMillis() + it)) }
+        )
+    }
+
+    // Emoción actual (la pregunta)
+    var currentEmotion by remember { mutableStateOf(questionList[0]) }
+
+    // Opciones de botones (se recalculan dinámicamente)
+    val options by remember(currentEmotion, numOptions, emotionPool) {
+        derivedStateOf {
+            val correctAnswer = currentEmotion.name
+            val incorrectAnswers = emotionPool
+                .map { it.name }
+                .filter { it != correctAnswer }
+                .shuffled()
+                .take(numOptions - 1)
+            (incorrectAnswers + correctAnswer).shuffled()
+        }
+    }
+
+    // Cronómetro
     LaunchedEffect(gameFinished, showInstructions) {
-        while (!gameFinished && !showInstructions) {
-            delay(1000)
-            startTime?.let {
-                elapsedTime = System.currentTimeMillis() - it
+        if (!gameFinished && !showInstructions) {
+            startTime?.let { start ->
+                while (!gameFinished) {
+                    delay(1000)
+                    elapsedTime = System.currentTimeMillis() - start
+                }
             }
         }
     }
 
-    // Manejar retroalimentación y cambio de emoción
-    LaunchedEffect(attempts) {
-        if (attempts > 0 && !gameFinished) {
+    // Lógica de Juego (Game Loop)
+    LaunchedEffect(currentRound) {
+        if (currentRound > 0 && !gameFinished) { // Si se ha jugado una ronda (no en la ronda 0)
+
             showFeedback = true
-            delay(1000) // Mostrar retroalimentación por 1 segundo
+            delay(1000)
             showFeedback = false
-            // Avanzar a la siguiente emoción
-            if (availableEmotions.size > 1) {
-                availableEmotions = availableEmotions.drop(1) // Eliminar la emoción actual
-                currentEmotion = availableEmotions.firstOrNull() ?: emotions[0]
-            } else {
-                // Reiniciar la lista si se acaban las emociones (aunque con 4 intentos no debería llegar aquí)
-                availableEmotions = emotions.shuffled()
-                currentEmotion = availableEmotions.firstOrNull() ?: emotions[0]
+
+            if (currentRound >= numRounds) { // Si se completaron todas las rondas
+                gameFinished = true
+                val durationSeconds = (elapsedTime / 1000).toInt()
+
+                // Extraer criterios
+                val (score3, time3, score2, time2) = starCriteria
+
+                // --- CORRECCIÓN 2: Usar .compareTo() ---
+                stars = when {
+                    // score == score3 && durationSeconds <= time3
+                    score == score3 && durationSeconds.compareTo(time3) <= 0 -> 3
+
+                    // score >= score2 && durationSeconds <= time2
+                    score.compareTo(score2) >= 0 && durationSeconds.compareTo(time2) <= 0 -> 2
+
+                    else -> 1
+                }
+
+            } else { // Si aún quedan rondas, avanzar a la siguiente
+                currentEmotion = questionList[currentRound]
             }
         }
     }
 
-    // Completar sesión después de 4 intentos
-    LaunchedEffect(attempts) {
-        if (attempts >= 4) {
-            gameFinished = true
-            val durationSeconds = (elapsedTime / 1000).toInt()
-
-            // Calcular estrellas basado en aciertos y tiempo
-            stars = when {
-                score == 4 && durationSeconds <= 20 -> 3  // Todo correcto y rápido (≤20s)
-                score >= 3 && durationSeconds <= 40 -> 2  // Mayoría correcta y tiempo moderado (≤40s)
-                else -> 1  // Completado con más errores o tiempo
-            }
-        }
-    }
-
+    // --- UI ---
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -105,49 +164,41 @@ fun EmotionsGame(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "¡Encuentra la emoción!",
+            text = "¡Encuentra la emoción! (Nivel $level)",
             style = MaterialTheme.typography.headlineMedium,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.semantics { contentDescription = "Título del juego de emociones" }
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { contentDescription = "Título del juego de emociones Nivel $level" }
         )
 
         if (!showInstructions && !gameFinished) {
-            // Imagen de la emoción
             Image(
-                painter = painterResource(id = currentEmotion.first),
-                contentDescription = "Emoción ${currentEmotion.second}",
+                painter = painterResource(id = currentEmotion.drawableId),
+                contentDescription = "Emoción ${currentEmotion.name}",
                 modifier = Modifier
                     .size(150.dp)
-                    .semantics { contentDescription = "Imagen de la emoción ${currentEmotion.second}" }
+                    .semantics { contentDescription = "Imagen de la emoción ${currentEmotion.name}" }
             )
 
             // Opciones
             options.forEach { option ->
                 Button(
                     onClick = {
-                        if (attempts < 4) { // Evitar clics después de completar la sesión
-                            attempts++
-                            isCorrect = option == currentEmotion.second
+                        if (!gameFinished && !showFeedback) {
+                            isCorrect = option == currentEmotion.name
                             if (isCorrect) {
-                                score += 1  // Incrementar aciertos (máximo 4)
+                                score += 1
                             }
+                            currentRound++ // Avanza a la siguiente ronda
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .semantics { contentDescription = "Botón para seleccionar $option" },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    enabled = attempts < 4 // Deshabilitar botones tras 4 intentos
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                    colors = ButtonDefaults.buttonColors( containerColor = MaterialTheme.colorScheme.primary ),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !gameFinished && !showFeedback
                 ) {
-                    Text(
-                        text = option,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text( text = option, fontSize = 18.sp, fontWeight = FontWeight.Medium )
                 }
             }
 
@@ -159,58 +210,47 @@ fun EmotionsGame(
             ) {
                 Text(
                     text = if (isCorrect) "¡Correcto! 🎉" else "¡Intenta de nuevo! 😊",
-                    color = if (isCorrect) Color.Green else Color.Red,
+                    color = if (isCorrect) Color(0xFF4CAF50) else Color(0xFFF44336),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.semantics { contentDescription = "Retroalimentación del juego" }
                 )
             }
 
-            // Puntuación actual (aciertos)
+            // Puntuación actual
             Text(
-                text = "Aciertos: $score",
+                text = "Progreso: $currentRound / $numRounds",
                 fontSize = 18.sp,
-                modifier = Modifier.semantics { contentDescription = "Aciertos actuales: $score" }
             )
         }
 
         // Mensaje final al terminar
         AnimatedVisibility(
             visible = gameFinished,
-            enter = fadeIn() + scaleIn()
+            enter = fadeIn() + scaleIn(),
+            modifier = Modifier.fillMaxSize()
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize().padding(16.dp)
             ) {
+                Text( "🎉 ¡Nivel $level completado!", style = MaterialTheme.typography.headlineMedium )
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "🎉 ¡Juego completado!",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.semantics { contentDescription = "Mensaje de juego completado" }
-                )
-                Text(
-                    text = "Aciertos: $score de 4",
+                    text = "Aciertos: $score de $numRounds",
                     style = MaterialTheme.typography.bodyLarge,
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.semantics { contentDescription = "Aciertos: $score de 4" }
+                    fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Tiempo: ${elapsedTime / 1000} s",
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.semantics { contentDescription = "Tiempo: ${elapsedTime / 1000} segundos" }
                 )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Estrellas obtenidas
-                Row {
-                    repeat(stars) {
-                        Text(
-                            text = "⭐",
-                            style = MaterialTheme.typography.headlineLarge,
-                            modifier = Modifier.semantics { contentDescription = "Estrella obtenida" }
-                        )
-                    }
-                }
+                Row { repeat(stars) { Text( "⭐", style = MaterialTheme.typography.headlineLarge ) } }
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
                     text = when (stars) {
@@ -218,23 +258,15 @@ fun EmotionsGame(
                         2 -> "Muy bien, pero puedes mejorar ⏳"
                         else -> "¡Sigue practicando! 💪"
                     },
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.semantics { contentDescription = "Mensaje de retroalimentación por estrellas" }
+                    style = MaterialTheme.typography.bodyLarge
                 )
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
                     onClick = {
-                        val timeTaken = System.currentTimeMillis() - startTime!!
-                        onSessionComplete(
-                            GameSession(
-                                childUserId = childUserId,
-                                gameType = "EMOTIONS",
-                                stars = stars,
-                                timeTaken = timeTaken,
-                                attempts = attempts,
-                                timestamp = System.currentTimeMillis()
-                            )
-                        )
+                        val timeTaken = if (startTime == null) 0L else (System.currentTimeMillis() - startTime!!)
+                        // Llama al callback con los resultados (numRounds es el total de "intentos")
+                        onGameEnd(stars, timeTaken, numRounds, level)
                     },
                     modifier = Modifier.semantics { contentDescription = "Botón para volver al menú" }
                 ) {
@@ -244,26 +276,28 @@ fun EmotionsGame(
         }
     }
 
-    // Modal de instrucciones al inicio
+    // Modal de instrucciones
     if (showInstructions) {
+        val (score3, time3, score2, time2) = starCriteria
         AlertDialog(
-            onDismissRequest = { },
+            onDismissRequest = { /* No cerrar */ },
             confirmButton = {
                 Button(onClick = {
                     showInstructions = false
                     startTime = System.currentTimeMillis()
                 }) {
-                    Text("Comenzar ▶️")
+                    Text("Comenzar Nivel $level ▶️")
                 }
             },
-            title = { Text("📖 Instrucciones") },
+            title = { Text("📖 Instrucciones (Nivel $level)") },
             text = {
-                Column {
-                    Text("Encuentra la emoción correcta para cada imagen.", style = MaterialTheme.typography.bodyLarge)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Encuentra la emoción correcta. Jugarás $numRounds rondas.", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("⭐ 3 estrellas → Todo correcto y rápido (≤20s)", style = MaterialTheme.typography.bodyMedium)
-                    Text("⭐ 2 estrellas → Mayoría correcta y tiempo moderado (≤40s)", style = MaterialTheme.typography.bodyMedium)
-                    Text("⭐ 1 estrella → Completado con más errores o tiempo", style = MaterialTheme.typography.bodyMedium)
+                    Text("Criterios para estrellas:", style = MaterialTheme.typography.labelLarge)
+                    Text("⭐ 3 estrellas → $score3 aciertos (≤$time3 s)", style = MaterialTheme.typography.bodyMedium)
+                    Text("⭐ 2 estrellas → $score2 aciertos (≤$time2 s)", style = MaterialTheme.typography.bodyMedium)
+                    Text("⭐ 1 estrella → ¡Completado!", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         )
