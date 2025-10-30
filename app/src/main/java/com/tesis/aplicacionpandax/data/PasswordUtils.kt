@@ -1,8 +1,8 @@
 package com.tesis.aplicacionpandax.data
 
+import java.util.Base64 // <-- Usa la versión de Java
 import java.security.MessageDigest
 import java.security.SecureRandom
-import android.util.Base64
 
 object PasswordUtils {
     private const val SALT_LEN = 16
@@ -11,7 +11,8 @@ object PasswordUtils {
         val sr = SecureRandom()
         val salt = ByteArray(SALT_LEN)
         sr.nextBytes(salt)
-        return Base64.encodeToString(salt, Base64.NO_WRAP)
+
+        return Base64.getEncoder().encodeToString(salt)
     }
 
     private fun sha256(input: ByteArray): ByteArray {
@@ -21,15 +22,19 @@ object PasswordUtils {
 
     fun hashPasswordWithSalt(password: String): Pair<String, String> {
         val salt = generateSalt()
-        val combined = password.toByteArray(Charsets.UTF_8) + Base64.decode(salt, Base64.NO_WRAP)
+
+        val combined = password.toByteArray(Charsets.UTF_8) + Base64.getDecoder().decode(salt)
         val hash = sha256(combined)
-        return Pair(salt, Base64.encodeToString(hash, Base64.NO_WRAP))
+
+        return Pair(salt, Base64.getEncoder().encodeToString(hash))
     }
 
     fun verify(password: String, salt: String, expectedHash: String): Boolean {
-        val combined = password.toByteArray(Charsets.UTF_8) + Base64.decode(salt, Base64.NO_WRAP)
+
+        val combined = password.toByteArray(Charsets.UTF_8) + Base64.getDecoder().decode(salt)
         val hash = sha256(combined)
-        val encoded = Base64.encodeToString(hash, Base64.NO_WRAP)
+
+        val encoded = Base64.getEncoder().encodeToString(hash)
         return encoded == expectedHash
     }
 }
