@@ -344,20 +344,28 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Pronunciation Game (Sin niveles aún)
+                    // Pronunciation Game (Actualizado para Nivel)
                     composable(
-                        route = "pronunciation_game/{childUserId}",
-                        arguments = listOf(navArgument("childUserId") { type = NavType.LongType })
+                        route = "pronunciation_game/{childUserId}/{level}", // 1. Ruta actualizada
+                        arguments = listOf(
+                            navArgument("childUserId") { type = NavType.LongType },
+                            navArgument("level") { type = NavType.IntType } // 2. Argumento de nivel añadido
+                        )
                     ) { backStackEntry ->
                         val childId = backStackEntry.arguments?.getLong("childUserId") ?: -1L
+                        val level = backStackEntry.arguments?.getInt("level") ?: 1 // 3. Extraer nivel
+
                         if (childId == -1L) {
                             Text("Error: ID de niño inválido.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight())
                         } else {
                             PronunciationGame(
                                 childUserId = childId,
                                 progressRepo = progressRepo,
-                                onGameEnd = { stars, timeTaken, attempts ->
-                                    // PronunciationGame ya guarda internamente
+                                level = level, // 4. Pasar el nivel
+                                // 5. Actualizar lambda onGameEnd
+                                onGameEnd = { stars, timeTaken, attempts, gameLevel ->
+                                    // PronunciationGame ya guarda internamente (con el nivel)
+                                    // Solo necesitamos volver atrás.
                                     navController.popBackStack()
                                 }
                             )

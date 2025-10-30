@@ -97,7 +97,7 @@ fun GamesMenuScreen(
                                 if (child != null) {
                                     // --- 👇 LÓGICA DE CLIC ACTUALIZADA 👇 ---
                                     // Comprueba si el juego requiere selección de nivel
-                                    if (game.name == "MEMORY" || game.name == "COORDINATION" || game.name == "EMOTIONS") {
+                                    if (game.name == "MEMORY" || game.name == "COORDINATION" || game.name == "EMOTIONS" || game.name == "PRONUNCIATION") {
                                         gameRequiringLevel = game // Muestra el diálogo de nivel
                                     } else {
                                         // Para otros juegos (Pronunciation), navega directamente
@@ -184,7 +184,7 @@ private fun GameGridItem(game: Game, onClick: () -> Unit) {
 @Composable
 private fun LevelSelectionDialog(
     gameName: String,
-    gameType: String, // "MEMORY", "COORDINATION", o "EMOTIONS"
+    gameType: String, // "MEMORY", "COORDINATION", o "EMOTIONS" y PRONUNCIATION
     onDismiss: () -> Unit,
     onLevelSelected: (Int) -> Unit
 ) {
@@ -193,6 +193,7 @@ private fun LevelSelectionDialog(
         "MEMORY" -> Triple("Nivel 1 (Fácil: 2x2)", "Nivel 2 (Normal: 2x4)", "Nivel 3 (Difícil: 3x4)")
         "COORDINATION" -> Triple("Nivel 1 (Fácil)", "Nivel 2 (Normal)", "Nivel 3 (Difícil)")
         "EMOTIONS" -> Triple("Nivel 1 (Fácil: 2 Opciones)", "Nivel 2 (Normal: 4 Opciones)", "Nivel 3 (Difícil: 6 Emociones)")
+        "PRONUNCIATION" -> Triple("Nivel 1 (Fácil: Monosílabas)", "Nivel 2 (Normal: Bisílabas)", "Nivel 3 (Difícil: Polisílabas)")
         else -> Triple("Nivel 1", "Nivel 2", "Nivel 3") // Default
     }
 
